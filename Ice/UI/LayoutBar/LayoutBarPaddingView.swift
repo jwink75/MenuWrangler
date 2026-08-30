@@ -147,6 +147,6 @@ final class LayoutBarPaddingView: NSView {
 }
 
 // MARK: - Logger
-private extension Logger {
+extension Logger {
     static let layoutBar = Logger(category: "LayoutBar")
 }

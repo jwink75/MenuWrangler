@@ -378,6 +378,7 @@ extension MenuBarItemManager {
                 alwaysHiddenControlItem: alwaysHiddenControlItem,
                 otherItems: items
             )
+            Logger.itemManager.debug("Cache populated: \(self.itemCache.managedItems.count) managed items")
         } catch {
             Logger.itemManager.error("Error enforcing control item order: \(error)")
         }

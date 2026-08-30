@@ -144,21 +144,31 @@ final class LayoutBarItemView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         if !isDraggingPlaceholder {
-            let iconBounds = bounds.insetBy(dx: 2, dy: 4)
-            if let fallbackImage {
+            if let image {
+                image.draw(
+                    in: bounds,
+                    from: .zero,
+                    operation: .sourceOver,
+                    fraction: isEnabled ? 1.0 : 0.67
+                )
+            } else if let fallbackImage {
+                let iconBounds = bounds.insetBy(dx: 2, dy: 4)
                 fallbackImage.draw(
                     in: iconBounds,
                     from: .zero,
                     operation: .sourceOver,
                     fraction: isEnabled ? 0.9 : 0.5
                 )
+            } else {
+                let iconBounds = bounds.insetBy(dx: 2, dy: 4)
+                (NSImage(systemSymbolName: "menubar.rectangle", accessibilityDescription: item.displayName) ?? NSImage())
+                    .draw(
+                        in: iconBounds,
+                        from: .zero,
+                        operation: .sourceOver,
+                        fraction: isEnabled ? 0.8 : 0.4
+                    )
             }
-            image?.draw(
-                in: bounds,
-                from: .zero,
-                operation: .sourceOver,
-                fraction: isEnabled ? 1.0 : 0.67
-            )
             if Bridging.responsivity(for: item.ownerPID) == .unresponsive {
                 let warningImage = NSImage.warning
                 let width: CGFloat = 15

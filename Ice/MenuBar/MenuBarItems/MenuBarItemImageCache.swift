@@ -226,20 +226,18 @@ final class MenuBarItemImageCache: ObservableObject {
             return
         }
 
+        // Always capture images when Settings window is presented
+        if await appState.navigationState.isSettingsPresented {
+            await updateCacheWithoutChecks(sections: sections)
+            return
+        }
+
         let isIceBarPresented = await appState.navigationState.isIceBarPresented
         let isSearchPresented = await appState.navigationState.isSearchPresented
 
         if !isIceBarPresented && !isSearchPresented {
             guard await appState.navigationState.isAppFrontmost else {
-                logSkippingCache(reason: "Ice Bar not visible, app not frontmost")
-                return
-            }
-            guard await appState.navigationState.isSettingsPresented else {
-                logSkippingCache(reason: "Ice Bar not visible, Settings not visible")
-                return
-            }
-            guard case .menuBarLayout = await appState.navigationState.settingsNavigationIdentifier else {
-                logSkippingCache(reason: "Ice Bar not visible, Settings visible but not on Menu Bar Layout")
+                logSkippingCache(reason: "MenuWrangler Bar not visible, app not frontmost")
                 return
             }
         }

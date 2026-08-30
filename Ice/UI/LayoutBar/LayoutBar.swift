@@ -18,12 +18,14 @@ struct LayoutBar: View {
         func updateNSView(_ nsView: LayoutBarScrollView, context: Context) {
             nsView.spacing = spacing
             let items = appState.itemManager.itemCache.managedItems(for: section.name)
+            Logger.layoutBar.debug("updateNSView: \(items.count) items for section \(self.section.name.displayString)")
             nsView.setArrangedViews(items: items)
         }
     }
 
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var imageCache: MenuBarItemImageCache
+    @State private var cacheUpdateID = UUID()
 
     let section: MenuBarSection
     let spacing: CGFloat
@@ -43,6 +45,7 @@ struct LayoutBar: View {
 
     var body: some View {
         conditionalBody
+            .id(cacheUpdateID)
             .frame(height: 50)
             .frame(maxWidth: .infinity)
             .layoutBarStyle(appState: appState, averageColorInfo: menuBarManager.averageColorInfo)
@@ -50,6 +53,9 @@ struct LayoutBar: View {
             .overlay {
                 backgroundShape
                     .stroke(.quaternary)
+            }
+            .onReceive(appState.itemManager.$itemCache) { _ in
+                cacheUpdateID = UUID()
             }
     }
 

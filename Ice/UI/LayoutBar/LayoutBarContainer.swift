@@ -189,6 +189,7 @@ final class LayoutBarContainer: NSView {
         else {
             return
         }
+        Logger.layoutBar.debug("Setting \(items?.count ?? 0) arranged views for section \(self.section.name.displayString)")
         guard let items else {
             arrangedViews.removeAll()
             return

@@ -231,3 +231,169 @@ Do not discard menu bar items with empty titles. Include them in the enumeration
 | **6. SDK Runtime Discrepancy & Fallbacks** | **Resolved ✅** | Configured `activeSpaceOnly: false` window discovery, added AppKit icon and SF Symbol fallbacks (`NSRunningApplication.icon`, system symbols for Wi-Fi, battery, clock, audio) in `LayoutBarItemView.swift` when screen capture buffers are unpopulated. |
 | **7. Gatekeeper & Build Integrity** | **Resolved ✅** | Removed pre-compiled Sparkle binaries, scrubbed Dropbox conflict files, and created automated build/sign/deploy script (`scripts/build.sh`) with deep code signing and quarantine attribute stripping. |
 
+---
+
+# Implementation Plan: Blank Layout Bars (Remaining Issue)
+
+## Problem
+
+After applying Fixes 1–7, the Menu Bar Layout settings pane renders the background and section labels correctly, but no menu bar item icons appear inside the layout bars. The bars are blank/empty.
+
+## Root Cause Analysis
+
+Investigation of the code pipeline (cache → container → item view → drawing) identified three compounding issues:
+
+### A. Items Not Visible Without Captured Images
+- `LayoutBarItemView.draw(_:)` only draws when `image` is non-nil
+- If the image cache hasn't captured an item's screenshot, the view exists but is transparent
+- Result: items are present but invisible
+
+### B. SwiftUI `updateNSView` Not Triggered on Cache Changes
+- `LayoutBar.updateNSView` reads from `appState.itemManager.itemCache`
+- Nothing in the view hierarchy observes the cache to trigger a re-render
+- If the cache populates after the initial view mount, `updateNSView` may not be called again
+- Result: items cached after initial render don't appear
+
+### C. Image Cache Guard Conditions Too Strict
+- `updateCache(sections:)` requires app frontmost + Settings visible + Menu Bar Layout pane selected
+- If any guard fails, images are never captured
+- Without images, items remain invisible (compounding issue A)
+
+---
+
+## Proposed Fixes
+
+### Fix 8: Fallback Drawing for Items Without Images
+
+**Priority:** 1 (highest impact)
+**File:** `LayoutBarItemView.swift` — `draw(_:)`
+
+**Description:** Draw a fallback representation when no captured image is available, so items are visible immediately.
+
+**Implementation:**
+```swift
+override func draw(_ dirtyRect: NSRect) {
+    if !isDraggingPlaceholder {
+        if let image {
+            image.draw(in: bounds, from: .zero, operation: .sourceOver, fraction: isEnabled ? 1.0 : 0.67)
+        } else {
+            // Fallback: draw app icon or generic placeholder
+            if let appIcon = item.owningApplication?.icon {
+                appIcon.draw(in: bounds)
+            } else {
+                NSImage(systemImage: "questionmark.square")?.draw(in: bounds)
+            }
+        }
+        // ... existing warning icon drawing
+    }
+}
+```
+
+**Expected Outcome:** All menu bar items become visible immediately, even before screen captures complete.
+
+---
+
+### Fix 9: Ensure Layout Bar Updates When Cache Changes
+
+**Priority:** 2
+**File:** `LayoutBar.swift`
+
+**Description:** Add explicit cache observation to trigger SwiftUI re-renders when the item cache updates.
+
+**Implementation:**
+```swift
+struct LayoutBar: View {
+    @EnvironmentObject var appState: AppState
+    @EnvironmentObject var imageCache: MenuBarItemImageCache
+    @State private var cacheUpdateID = UUID()
+
+    var body: some View {
+        conditionalBody
+            .frame(height: 50)
+            .frame(maxWidth: .infinity)
+            .layoutBarStyle(appState: appState, averageColorInfo: menuBarManager.averageColorInfo)
+            .clipShape(backgroundShape)
+            .overlay {
+                backgroundShape.stroke(.quaternary)
+            }
+            .onReceive(appState.itemManager.$itemCache) { _ in
+                cacheUpdateID = UUID() // Force re-render on cache change
+            }
+    }
+}
+```
+
+**Expected Outcome:** Layout bar always reflects current cache state, even if cache populates after initial view mount.
+
+---
+
+### Fix 10: Relax Image Cache Guards for Settings Context
+
+**Priority:** 3
+**File:** `MenuBarItemImageCache.swift` — `updateCache(sections:)`
+
+**Description:** Allow image capture whenever the Settings window is visible, not just when the Menu Bar Layout pane is selected.
+
+**Implementation:**
+```swift
+func updateCache(sections: [MenuBarSection.Name]) async {
+    guard let appState else { return }
+
+    // Always capture images when Settings are presented
+    if appState.settingsWindow?.isVisible == true {
+        await updateCacheWithoutChecks(sections: sections)
+        return
+    }
+
+    // Existing guards for non-settings contexts...
+}
+```
+
+**Expected Outcome:** Images are captured proactively while Settings are open, reducing the window where items appear without images.
+
+---
+
+### Fix 11: Diagnostic Logging Pipeline
+
+**Priority:** 4 (debugging aid)
+**Files:** `LayoutBar.swift`, `LayoutBarContainer.swift`, `MenuBarItemManager.swift`
+
+**Description:** Add temporary logging at each stage of the item pipeline to trace where items are being lost.
+
+**Implementation:**
+```swift
+// In LayoutBar.updateNSView
+Logger.layoutBar.debug("updateNSView: \(items.count) items for section \(section.name)")
+
+// In LayoutBarContainer.setArrangedViews
+Logger.layoutBar.debug("Setting \(items?.count ?? 0) arranged views")
+
+// In MenuBarItemManager.cacheItemsIfNeeded
+Logger.itemManager.debug("Cache populated: \(itemCache.managedItems.count) managed items")
+```
+
+**Expected Outcome:** Clear visibility into item counts at each pipeline stage for debugging.
+
+---
+
+## Implementation Order
+
+| Step | Fix | Rationale |
+|------|-----|-----------|
+| 1 | Fix 8 (fallback drawing) | Immediate visual improvement; items become visible |
+| 2 | Fix 9 (cache observation) | Ensures updates propagate to UI |
+| 3 | Fix 10 (relax guards) | Improves image capture reliability |
+| 4 | Fix 11 (logging) | Diagnostic tool for verifying fixes |
+
+---
+
+## Verification Steps
+
+After implementing each fix:
+
+1. Open Ice Settings → Menu Bar Layout pane
+2. Verify that icons appear in the Visible and Hidden section layout bars
+3. Verify that dragging items between sections works
+4. Check Console.app for any error messages from the `ImageCache` or `LayoutBar` log categories
+5. Confirm items remain visible after switching between settings panes
+
