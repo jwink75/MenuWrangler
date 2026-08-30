@@ -201,7 +201,7 @@ final class LayoutBarItemView: NSView {
         pasteboardItem.setData(Data(), forType: .layoutBarItem)
 
         let draggingItem = NSDraggingItem(pasteboardWriter: pasteboardItem)
-        draggingItem.setDraggingFrame(bounds, contents: image)
+        draggingItem.setDraggingFrame(bounds, contents: image ?? fallbackImage)
 
         beginDraggingSession(with: [draggingItem], event: event, source: self)
     }

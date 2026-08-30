@@ -346,19 +346,19 @@ extension MenuBarItemManager {
         var hiddenControlItem: MenuBarItem?
         if let hiddenWindowID, let index = items.firstIndex(where: { $0.windowID == hiddenWindowID }) {
             hiddenControlItem = items.remove(at: index)
-        } else if let index = items.firstIndex(matching: .hiddenControlItem) {
+        } else if let hiddenWindowID, let item = MenuBarItem(windowID: hiddenWindowID) {
+            hiddenControlItem = item
+        } else if let index = items.firstIndex(where: { $0.owningApplication == .current && $0.info.title == ControlItem.Identifier.hidden.rawValue }) {
             hiddenControlItem = items.remove(at: index)
-        } else if let hiddenWindowID {
-            hiddenControlItem = MenuBarItem(windowID: hiddenWindowID)
         }
 
         var alwaysHiddenControlItem: MenuBarItem?
         if let alwaysHiddenWindowID, let index = items.firstIndex(where: { $0.windowID == alwaysHiddenWindowID }) {
             alwaysHiddenControlItem = items.remove(at: index)
-        } else if let index = items.firstIndex(matching: .alwaysHiddenControlItem) {
+        } else if let alwaysHiddenWindowID, let item = MenuBarItem(windowID: alwaysHiddenWindowID) {
+            alwaysHiddenControlItem = item
+        } else if let index = items.firstIndex(where: { $0.owningApplication == .current && $0.info.title == ControlItem.Identifier.alwaysHidden.rawValue }) {
             alwaysHiddenControlItem = items.remove(at: index)
-        } else if let alwaysHiddenWindowID {
-            alwaysHiddenControlItem = MenuBarItem(windowID: alwaysHiddenWindowID)
         }
 
         guard let hiddenControlItem else {

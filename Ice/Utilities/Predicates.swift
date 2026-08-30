@@ -76,21 +76,24 @@ extension Predicates where Input == MenuBarItem {
     /// using the control item for the hidden section as a delimiter.
     static func isInVisibleSection(hiddenControlItem: MenuBarItem) -> NonThrowingPredicate {
         predicate { item in
-            item.frame.minX >= hiddenControlItem.frame.maxX
+            let delimiterBoundary = hiddenControlItem.frame.width > 0 ? hiddenControlItem.frame.maxX : hiddenControlItem.frame.minX
+            return item.frame.minX >= delimiterBoundary
         }
     }
 
     /// Creates a predicate that returns whether a menu bar item is in the hidden section
     /// using the control items for the hidden and always hidden sections as delimiters.
     static func isInHiddenSection(hiddenControlItem: MenuBarItem, alwaysHiddenControlItem: MenuBarItem?) -> NonThrowingPredicate {
+        let hiddenBoundary = hiddenControlItem.frame.width > 0 ? hiddenControlItem.frame.minX : hiddenControlItem.frame.maxX
         if let alwaysHiddenControlItem {
-            predicate { item in
-                item.frame.maxX <= hiddenControlItem.frame.minX &&
-                item.frame.minX >= alwaysHiddenControlItem.frame.maxX
+            let alwaysHiddenBoundary = alwaysHiddenControlItem.frame.width > 0 ? alwaysHiddenControlItem.frame.maxX : alwaysHiddenControlItem.frame.minX
+            return predicate { item in
+                item.frame.maxX <= hiddenBoundary &&
+                item.frame.minX >= alwaysHiddenBoundary
             }
         } else {
-            predicate { item in
-                item.frame.maxX <= hiddenControlItem.frame.minX
+            return predicate { item in
+                item.frame.maxX <= hiddenBoundary
             }
         }
     }
@@ -99,11 +102,12 @@ extension Predicates where Input == MenuBarItem {
     /// section using the control item for the always hidden section as a delimiter.
     static func isInAlwaysHiddenSection(alwaysHiddenControlItem: MenuBarItem?) -> NonThrowingPredicate {
         if let alwaysHiddenControlItem {
-            predicate { item in
-                item.frame.maxX <= alwaysHiddenControlItem.frame.minX
+            let alwaysHiddenBoundary = alwaysHiddenControlItem.frame.width > 0 ? alwaysHiddenControlItem.frame.minX : alwaysHiddenControlItem.frame.maxX
+            return predicate { item in
+                item.frame.maxX <= alwaysHiddenBoundary
             }
         } else {
-            predicate { false }
+            return predicate { false }
         }
     }
 
