@@ -42,8 +42,29 @@ struct DirectQueryLayoutBar: View {
     }
 
     private func filterWindowsForSection(_ windows: [LayoutItemInfo]) -> [LayoutItemInfo] {
-        windows.filter { window in
-            window.ownerName != "MenuWrangler" && window.ownerName != "Ice"
+        let currentPID = NSRunningApplication.current.processIdentifier
+        let sortedWindows = windows.sorted { $0.frame.origin.x < $1.frame.origin.x }
+
+        let delimiterX: CGFloat
+        if let delimiter = sortedWindows.first(where: { window in
+            window.ownerPID == currentPID || window.ownerName == "MenuWrangler" || window.ownerName == "Ice"
+        }) {
+            delimiterX = delimiter.frame.origin.x
+        } else {
+            delimiterX = (NSScreen.main?.frame.width ?? 1200) * 0.75
+        }
+
+        let nonSelfWindows = sortedWindows.filter { window in
+            window.ownerPID != currentPID && window.ownerName != "MenuWrangler" && window.ownerName != "Ice"
+        }
+
+        switch section.name {
+        case .visible:
+            return nonSelfWindows.filter { $0.frame.origin.x >= delimiterX }
+        case .hidden:
+            return nonSelfWindows.filter { $0.frame.origin.x < delimiterX }
+        case .alwaysHidden:
+            return []
         }
     }
 }

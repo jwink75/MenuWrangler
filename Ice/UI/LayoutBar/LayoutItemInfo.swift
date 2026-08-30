@@ -12,6 +12,7 @@ struct LayoutItemInfo: Identifiable, Hashable {
     let ownerPID: pid_t
     let ownerName: String
     let frame: CGRect
+    let title: String
 
     var isMovable: Bool { true }
 
