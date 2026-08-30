@@ -6,6 +6,7 @@
 import SwiftUI
 
 struct DirectQueryLayoutBar: View {
+    @EnvironmentObject var appState: AppState
     let section: MenuBarSection
     @State private var items: [LayoutItemInfo] = []
     @State private var draggedItem: LayoutItemInfo?
@@ -21,9 +22,6 @@ struct DirectQueryLayoutBar: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("No items")
                             .foregroundStyle(.secondary)
-                        Text("delX=\(Int(UserDefaults.standard.double(forKey: "LayoutBar_delimiterX_\(section.name.displayString)")))")
-                            .font(.system(size: 8))
-                            .foregroundStyle(.tertiary)
                     }
                     .padding(.horizontal, 12)
                     .frame(height: 32)
@@ -50,7 +48,6 @@ struct DirectQueryLayoutBar: View {
                 .stroke(.quaternary, lineWidth: 0.5)
         )
         .onAppear {
-            // Delay slightly to ensure windows are available for capture
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 refreshItems()
             }
@@ -72,13 +69,7 @@ struct DirectQueryLayoutBar: View {
         lastRefreshTime = now
 
         let allWindows = WindowQuery.getMenuBarWindows()
-        print("[LayoutBar] Section: \(section.name.displayString)")
-        print("[LayoutBar] Found \(allWindows.count) windows")
-        for window in allWindows {
-            print("[LayoutBar]   - \(window.ownerName) | \(window.title) | x=\(window.frame.origin.x) | isDelimiter=\(window.isDelimiter)")
-        }
         items = filterWindowsForSection(allWindows)
-        print("[LayoutBar] After filtering: \(items.count) items")
         isRefreshing = false
     }
 
@@ -86,7 +77,7 @@ struct DirectQueryLayoutBar: View {
         let sortedWindows = windows.sorted { $0.frame.origin.x < $1.frame.origin.x }
 
         let delimiter = sortedWindows.first { $0.isDelimiter }
-        let delimiterX = delimiter?.frame.origin.x ?? 0
+        let delimiterX = delimiter?.frame.origin.x ?? ((NSScreen.main?.frame.width ?? 1200) * 0.75)
 
         let result: [LayoutItemInfo]
         switch section.name {
@@ -128,10 +119,41 @@ struct DirectQueryLayoutBar: View {
     }
 
     private func moveItem(windowID: CGWindowID, to section: MenuBarSection) {
-        print("Moving window \(windowID) to section \(section.name.displayString)")
-        draggedItem = nil
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            self.refreshItems()
+        guard let item = MenuBarItem(windowID: windowID) else {
+            draggedItem = nil
+            return
+        }
+
+        guard let hiddenWinID = appState.menuBarManager.section(withName: .hidden)?.controlItem.windowID,
+              let hiddenControlItem = MenuBarItem(windowID: hiddenWinID) else {
+            draggedItem = nil
+            return
+        }
+
+        Task {
+            do {
+                switch section.name {
+                case .visible:
+                    try await appState.itemManager.move(item: item, to: .rightOfItem(hiddenControlItem))
+                case .hidden:
+                    try await appState.itemManager.move(item: item, to: .leftOfItem(hiddenControlItem))
+                case .alwaysHidden:
+                    if let alwaysHiddenWinID = appState.menuBarManager.section(withName: .alwaysHidden)?.controlItem.windowID,
+                       let alwaysHiddenControlItem = MenuBarItem(windowID: alwaysHiddenWinID) {
+                        try await appState.itemManager.move(item: item, to: .leftOfItem(alwaysHiddenControlItem))
+                    }
+                }
+                await MainActor.run {
+                    self.draggedItem = nil
+                    WindowQuery.clearIconCache()
+                    self.refreshItems()
+                }
+            } catch {
+                print("Failed to move item: \(error)")
+                await MainActor.run {
+                    self.draggedItem = nil
+                }
+            }
         }
     }
 }

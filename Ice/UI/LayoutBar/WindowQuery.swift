@@ -6,12 +6,11 @@
 import Cocoa
 
 enum WindowQuery {
-    /// Cache for application icons to avoid repeated LaunchServices queries
-    private static var iconCache: [pid_t: NSImage] = [:]
-    private static let iconCacheLock = NSLock()
+    /// Cache for resolved window images to avoid repeated screen capture overhead
+    private static var windowIconCache: [CGWindowID: NSImage] = [:]
+    private static let cacheLock = NSLock()
 
     static func getMenuBarWindows() -> [LayoutItemInfo] {
-        // Use the same approach as the original Ice code - more reliable than CGWindowListCopyWindowInfo
         let windowIDs = Bridging.getWindowList(option: [.menuBarItems])
 
         var allOwnerNames: Set<String> = []
@@ -27,10 +26,22 @@ enum WindowQuery {
                 return nil
             }
 
+            let frame = windowInfo.frame
+
+            // Filter out phantom windows, spacers, and zero-dimension proxy windows
+            guard frame.width > 4 && frame.height > 8 else {
+                return nil
+            }
+
+            // Filter out fully transparent / hidden helper windows
+            guard windowInfo.alpha > 0.05 else {
+                return nil
+            }
+
             let ownerName = windowInfo.ownerName ?? "Unknown"
             let windowTitle = windowInfo.title ?? ""
             let ownerPID = windowInfo.ownerPID
-            let frame = windowInfo.frame
+            let bundleIdentifier = NSRunningApplication(processIdentifier: ownerPID)?.bundleIdentifier
 
             // Collect debug info
             allOwnerNames.insert(ownerName)
@@ -38,16 +49,24 @@ enum WindowQuery {
                 allTitles.insert(windowTitle)
             }
 
-            // Identify delimiter by title: "HItem" is the hidden section delimiter
-            let isDelimiter = (windowTitle == "HItem" || ownerName == "MenuWrangler" || ownerName == "Ice")
+            // Identify delimiter: "HItem" / "SItem" / MenuWrangler process
+            let isDelimiter = (windowTitle == "HItem" || windowTitle == "SItem" || ownerName == "MenuWrangler" || ownerName == "Ice" || ownerPID == NSRunningApplication.current.processIdentifier)
 
-            let image = createFallbackImage(for: windowID, ownerPID: ownerPID, ownerName: ownerName, title: windowTitle, frame: frame)
+            let image = resolveImage(
+                for: windowID,
+                ownerPID: ownerPID,
+                ownerName: ownerName,
+                bundleIdentifier: bundleIdentifier,
+                title: windowTitle,
+                frame: frame
+            )
 
             return LayoutItemInfo(
                 windowID: windowID,
                 image: image,
                 ownerPID: ownerPID,
                 ownerName: ownerName,
+                bundleIdentifier: bundleIdentifier,
                 frame: frame,
                 title: windowTitle,
                 isDelimiter: isDelimiter
@@ -63,29 +82,73 @@ enum WindowQuery {
         return result
     }
 
-    private static func createFallbackImage(for windowID: CGWindowID, ownerPID: pid_t, ownerName: String, title: String, frame: CGRect) -> NSImage {
-        // Try screen capture first
+    private static func resolveImage(
+        for windowID: CGWindowID,
+        ownerPID: pid_t,
+        ownerName: String,
+        bundleIdentifier: String?,
+        title: String,
+        frame: CGRect
+    ) -> NSImage {
+        cacheLock.lock()
+        if let cached = windowIconCache[windowID] {
+            cacheLock.unlock()
+            return cached
+        }
+        cacheLock.unlock()
+
+        let image = createImage(
+            for: windowID,
+            ownerPID: ownerPID,
+            ownerName: ownerName,
+            bundleIdentifier: bundleIdentifier,
+            title: title,
+            frame: frame
+        )
+
+        cacheLock.lock()
+        windowIconCache[windowID] = image
+        cacheLock.unlock()
+
+        return image
+    }
+
+    private static func createImage(
+        for windowID: CGWindowID,
+        ownerPID: pid_t,
+        ownerName: String,
+        bundleIdentifier: String?,
+        title: String,
+        frame: CGRect
+    ) -> NSImage {
+        // 1. Try live screen capture first
         if let cgImage = ScreenCapture.captureWindow(windowID, screenBounds: frame, option: .boundsIgnoreFraming),
            cgImage.width > 0 && cgImage.height > 0,
            cgImage.hasVisiblePixels {
             let scale = NSScreen.main?.backingScaleFactor ?? 2
-            let img = NSImage(cgImage: cgImage, size: NSSize(width: CGFloat(cgImage.width) / scale, height: CGFloat(cgImage.height) / scale))
-            return img
+            return NSImage(cgImage: cgImage, size: NSSize(width: CGFloat(cgImage.width) / scale, height: CGFloat(cgImage.height) / scale))
         }
 
-        // Try CGWindowListCreateImage as fallback
+        // 2. Try CGWindowListCreateImage as fallback
         if let cgImage = CGWindowListCreateImage(.null, .optionIncludingWindow, windowID, .boundsIgnoreFraming),
            cgImage.width > 0 && cgImage.height > 0,
            cgImage.hasVisiblePixels {
             let scale = NSScreen.main?.backingScaleFactor ?? 2
-            let img = NSImage(cgImage: cgImage, size: NSSize(width: CGFloat(cgImage.width) / scale, height: CGFloat(cgImage.height) / scale))
-            return img
+            return NSImage(cgImage: cgImage, size: NSSize(width: CGFloat(cgImage.width) / scale, height: CGFloat(cgImage.height) / scale))
         }
 
         let titleLower = title.lowercased()
         let ownerLower = ownerName.lowercased()
+        let isControlCenter = (ownerName == "ControlCenter" || bundleIdentifier == "com.apple.controlcenter")
 
-        // Try to find a matching SF Symbol based on title
+        // 3. For third-party apps, fetch the real application icon before falling back to generic symbols
+        if !isControlCenter && ownerName != "SystemUIServer" && ownerName != "Window Server" {
+            if let app = NSRunningApplication(processIdentifier: ownerPID), let icon = app.icon {
+                return icon
+            }
+        }
+
+        // 4. Try to find a matching SF Symbol based on title or keywords
         let symbolName: String?
         if titleLower.contains("wifi") || titleLower.contains("wi-fi") {
             symbolName = "wifi"
@@ -97,11 +160,11 @@ enum WindowQuery {
             symbolName = "speaker.wave.2"
         } else if titleLower.contains("airdrop") {
             symbolName = "airdrop"
-        } else if titleLower.contains("display") || titleLower.contains("monitor") {
+        } else if titleLower.contains("display") || titleLower.contains("monitor") || titleLower.contains("brightness") {
             symbolName = "display"
         } else if titleLower.contains("focus") || titleLower.contains("dnd") || titleLower.contains("do not disturb") {
             symbolName = "moon.fill"
-        } else if titleLower.contains("now playing") || titleLower.contains("music") {
+        } else if titleLower.contains("now playing") || titleLower.contains("music") || titleLower.contains("media") {
             symbolName = "play.circle"
         } else if titleLower.contains("spotlight") || titleLower.contains("search") {
             symbolName = "magnifyingglass"
@@ -119,11 +182,9 @@ enum WindowQuery {
             symbolName = "shippingbox"
         } else if titleLower.contains("keyboard") || titleLower.contains("maestro") || titleLower.contains("macro") {
             symbolName = "command"
-        } else if titleLower.contains("media") || titleLower.contains("play") {
-            symbolName = "play.circle"
         } else if titleLower.contains("clock") || titleLower.contains("time") || titleLower.contains("date") {
             symbolName = "clock"
-        } else if titleLower.contains("controlcenter") || titleLower.contains("control center") {
+        } else if isControlCenter && (titleLower.contains("bentobox") || titleLower.contains("controlcenter") || titleLower.contains("control center")) {
             symbolName = "switch.2"
         } else {
             symbolName = nil
@@ -134,13 +195,7 @@ enum WindowQuery {
             return symbolImage
         }
 
-        // Try to get the application icon
-        let appIcon = cachedIcon(for: ownerPID, ownerName: ownerName)
-        if appIcon.size != NSSize(width: 24, height: 24) {
-            return appIcon
-        }
-
-        // Final fallback: generic menubar icon
+        // 5. Final fallback: generic menubar icon
         if let generic = NSImage(systemSymbolName: "menubar.rectangle", accessibilityDescription: ownerName) {
             generic.isTemplate = true
             return generic
@@ -149,37 +204,10 @@ enum WindowQuery {
         return NSImage(size: NSSize(width: 24, height: 24))
     }
 
-    /// Returns a cached icon for the given PID, or fetches and caches it
-    private static func cachedIcon(for ownerPID: pid_t, ownerName: String) -> NSImage {
-        iconCacheLock.lock()
-        defer { iconCacheLock.unlock() }
-
-        if let cached = iconCache[ownerPID] {
-            return cached
-        }
-
-        var icon: NSImage?
-        if let app = NSRunningApplication(processIdentifier: ownerPID) {
-            icon = app.icon
-        }
-
-        if let icon {
-            iconCache[ownerPID] = icon
-            return icon
-        }
-
-        if let generic = NSImage(systemSymbolName: "menubar.rectangle", accessibilityDescription: ownerName) {
-            generic.isTemplate = true
-            return generic
-        }
-
-        return NSImage(size: NSSize(width: 24, height: 24))
-    }
-
-    /// Clears the icon cache (useful for testing or when apps change)
+    /// Clears the window icon cache
     static func clearIconCache() {
-        iconCacheLock.lock()
-        defer { iconCacheLock.unlock() }
-        iconCache.removeAll()
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        windowIconCache.removeAll()
     }
 }

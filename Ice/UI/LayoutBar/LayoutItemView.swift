@@ -9,15 +9,16 @@ struct LayoutItemView: View {
     let item: LayoutItemInfo
 
     var body: some View {
-        VStack(spacing: 1) {
+        VStack(spacing: 2) {
             Image(nsImage: item.image)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
                 .frame(width: 20, height: 20)
-            Text(item.title.isEmpty ? item.ownerName : item.title)
-                .font(.system(size: 7))
+            Text(item.resolvedTitle)
+                .font(.system(size: 8, weight: .medium))
                 .lineLimit(1)
                 .truncationMode(.tail)
+                .frame(maxWidth: 54)
         }
         .padding(4)
         .background(
@@ -28,7 +29,10 @@ struct LayoutItemView: View {
             RoundedRectangle(cornerRadius: 6)
                 .stroke(Color.primary.opacity(0.12), lineWidth: 0.5)
         )
-        .help(item.title.isEmpty ? (item.ownerName.isEmpty ? "Menu Bar Item" : item.ownerName) : item.title)
+        .help(item.resolvedTitle)
         .contentShape(Rectangle())
+        .onDrag {
+            NSItemProvider(object: "\(item.windowID)" as NSString)
+        }
     }
 }
