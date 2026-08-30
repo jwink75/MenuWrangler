@@ -327,7 +327,7 @@ final class MenuBarManager: ObservableObject {
 
     /// Shows the right-click menu.
     func showRightClickMenu(at point: CGPoint) {
-        let menu = NSMenu(title: "Ice")
+        let menu = NSMenu(title: "MenuWrangler")
 
         let editItem = NSMenuItem(
             title: "Edit Menu Bar Appearance…",
@@ -340,7 +340,7 @@ final class MenuBarManager: ObservableObject {
         menu.addItem(.separator())
 
         let settingsItem = NSMenuItem(
-            title: "Ice Settings…",
+            title: "MenuWrangler Settings…",
             action: #selector(AppDelegate.openSettingsWindow),
             keyEquivalent: ","
         )

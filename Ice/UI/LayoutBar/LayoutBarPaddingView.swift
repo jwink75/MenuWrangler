@@ -47,18 +47,22 @@ final class LayoutBarPaddingView: NSView {
         NSLayoutConstraint.activate([
             // center the container along the y axis
             container.centerYAnchor.constraint(equalTo: centerYAnchor),
+            container.topAnchor.constraint(greaterThanOrEqualTo: topAnchor),
+            bottomAnchor.constraint(greaterThanOrEqualTo: container.bottomAnchor),
 
-            // give the container a few points of trailing space
-            trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: 7.5),
+            // start container from the leading edge with 10 points padding
+            container.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
 
-            // allow variable spacing between leading anchors to let the view stretch
-            // to fit whatever size is required; container should remain aligned toward
-            // the trailing edge; this view is itself nested in a scroll view, so if it
-            // has to expand to a larger size, it can be clipped
-            leadingAnchor.constraint(lessThanOrEqualTo: container.leadingAnchor, constant: -7.5),
+            // allow trailing anchor to expand as needed
+            trailingAnchor.constraint(greaterThanOrEqualTo: container.trailingAnchor, constant: 10),
         ])
 
         registerForDraggedTypes([.layoutBarItem])
+    }
+
+    /// Sets the arranged views with the given items.
+    func setArrangedViews(items: [MenuBarItem]) {
+        container.setArrangedViews(items: items)
     }
 
     @available(*, unavailable)

@@ -47,7 +47,6 @@ final class LayoutBarScrollView: NSScrollView {
 
         self.documentView = self.paddingView
 
-        self.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             // constrain the padding view's height to the content view's height
             paddingView.heightAnchor.constraint(equalTo: contentView.heightAnchor),
@@ -56,11 +55,14 @@ final class LayoutBarScrollView: NSScrollView {
             // view's width
             paddingView.widthAnchor.constraint(greaterThanOrEqualTo: contentView.widthAnchor),
 
-            // constrain the padding view's trailing anchor to the content view's trailing
-            // anchor; this, in combination with the above width constraint, aligns the
-            // items in the layout bar to the trailing edge
-            paddingView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            // constrain the padding view's leading anchor to the content view's leading anchor
+            paddingView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
         ])
+    }
+
+    /// Sets the arranged views with the given items.
+    func setArrangedViews(items: [MenuBarItem]) {
+        paddingView.setArrangedViews(items: items)
     }
 
     @available(*, unavailable)

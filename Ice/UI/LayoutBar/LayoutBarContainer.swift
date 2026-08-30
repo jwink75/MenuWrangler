@@ -15,14 +15,14 @@ final class LayoutBarContainer: NSView {
 
     /// Cached width constraint for the container view.
     private lazy var widthConstraint: NSLayoutConstraint = {
-        let constraint = widthAnchor.constraint(equalToConstant: 0)
+        let constraint = widthAnchor.constraint(greaterThanOrEqualToConstant: 28)
         constraint.isActive = true
         return constraint
     }()
 
     /// Cached height constraint for the container view.
     private lazy var heightConstraint: NSLayoutConstraint = {
-        let constraint = heightAnchor.constraint(equalToConstant: 0)
+        let constraint = heightAnchor.constraint(greaterThanOrEqualToConstant: 28)
         constraint.isActive = true
         return constraint
     }()
@@ -175,7 +175,7 @@ final class LayoutBarContainer: NSView {
         // update the width and height constraints using the information
         // collected while iterating
         widthConstraint.constant = previous?.frame.maxX ?? 0
-        heightConstraint.constant = maxHeight
+        heightConstraint.constant = max(maxHeight, 28)
     }
 
     /// Sets the container's arranged views with the given items.

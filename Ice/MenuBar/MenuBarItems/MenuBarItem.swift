@@ -182,7 +182,6 @@ extension MenuBarItem {
         }
         if activeSpaceOnly {
             option.insert(.activeSpace)
-            titlePredicate = { $0.title != "" }
         }
         if let display {
             let displayBounds = CGDisplayBounds(display)

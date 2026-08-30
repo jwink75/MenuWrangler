@@ -31,6 +31,28 @@ final class LayoutBarItemView: NSView {
     /// A Boolean value that indicates whether the item view is currently inside a container.
     var hasContainer = false
 
+    /// Fallback icon to display if captured window image is unavailable or transparent.
+    private var fallbackImage: NSImage? {
+        if let app = item.owningApplication, let icon = app.icon {
+            return icon
+        }
+        if item.info.namespace == .controlCenter {
+            let title = item.title?.lowercased() ?? ""
+            if title.contains("wifi") || title.contains("wi-fi") {
+                return NSImage(systemSymbolName: "wifi", accessibilityDescription: item.displayName)
+            } else if title.contains("battery") {
+                return NSImage(systemSymbolName: "battery.100", accessibilityDescription: item.displayName)
+            } else if title.contains("clock") || title.contains("time") {
+                return NSImage(systemSymbolName: "clock", accessibilityDescription: item.displayName)
+            } else if title.contains("sound") || title.contains("volume") {
+                return NSImage(systemSymbolName: "speaker.wave.2", accessibilityDescription: item.displayName)
+            } else {
+                return NSImage(systemSymbolName: "switch.2", accessibilityDescription: item.displayName)
+            }
+        }
+        return NSImage(systemSymbolName: "menubar.rectangle", accessibilityDescription: item.displayName)
+    }
+
     /// The image displayed inside the view.
     private var image: NSImage? {
         didSet {
@@ -38,13 +60,12 @@ final class LayoutBarItemView: NSView {
                 let image,
                 let screen = appState?.imageCache.screen
             {
-                let size = CGSize(
-                    width: image.size.width / screen.backingScaleFactor,
-                    height: image.size.height / screen.backingScaleFactor
-                )
-                setFrameSize(size)
+                let width = max(image.size.width / screen.backingScaleFactor, 24)
+                let height: CGFloat = 28
+                setFrameSize(CGSize(width: width, height: height))
             } else {
-                setFrameSize(.zero)
+                let initialWidth = max(item.frame.width > 0 ? item.frame.width : 28, 24)
+                setFrameSize(CGSize(width: initialWidth, height: 28))
             }
             needsDisplay = true
         }
@@ -71,8 +92,8 @@ final class LayoutBarItemView: NSView {
         self.item = item
         self.appState = appState
 
-        // set the frame to the full item frame size; the image will be centered when displayed
-        super.init(frame: CGRect(origin: .zero, size: item.frame.size))
+        let initialWidth = max(item.frame.width > 0 ? item.frame.width : 28, 24)
+        super.init(frame: CGRect(origin: .zero, size: CGSize(width: initialWidth, height: 28)))
         unregisterDraggedTypes()
 
         self.toolTip = item.displayName
@@ -123,6 +144,15 @@ final class LayoutBarItemView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         if !isDraggingPlaceholder {
+            let iconBounds = bounds.insetBy(dx: 2, dy: 4)
+            if let fallbackImage {
+                fallbackImage.draw(
+                    in: iconBounds,
+                    from: .zero,
+                    operation: .sourceOver,
+                    fraction: isEnabled ? 0.9 : 0.5
+                )
+            }
             image?.draw(
                 in: bounds,
                 from: .zero,

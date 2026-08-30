@@ -17,6 +17,8 @@ struct LayoutBar: View {
 
         func updateNSView(_ nsView: LayoutBarScrollView, context: Context) {
             nsView.spacing = spacing
+            let items = appState.itemManager.itemCache.managedItems(for: section.name)
+            nsView.setArrangedViews(items: items)
         }
     }
 
@@ -53,11 +55,6 @@ struct LayoutBar: View {
 
     @ViewBuilder
     private var conditionalBody: some View {
-        if imageCache.cacheFailed(for: section.name) {
-            Text("Unable to display menu bar items")
-                .foregroundStyle(menuBarManager.averageColorInfo?.color.brightness ?? 0 > 0.67 ? .black : .white)
-        } else {
-            Representable(appState: appState, section: section, spacing: spacing)
-        }
+        Representable(appState: appState, section: section, spacing: spacing)
     }
 }

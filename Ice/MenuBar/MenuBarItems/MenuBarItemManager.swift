@@ -28,6 +28,11 @@ final class MenuBarItemManager: ObservableObject {
             }
         }
 
+        /// A Boolean value that indicates whether the cache is empty.
+        var isEmpty: Bool {
+            allItems.isEmpty
+        }
+
         /// Clears the cache.
         mutating func clear() {
             items.removeAll()
@@ -326,22 +331,38 @@ extension MenuBarItemManager {
         }
 
         let itemWindowIDs = Bridging.getWindowList(option: [.menuBarItems, .activeSpace])
-        if cachedItemWindowIDs == itemWindowIDs {
+        if !itemCache.isEmpty && cachedItemWindowIDs == itemWindowIDs {
             logSkippingCache(reason: "item windows have not changed")
             return
         } else {
             cachedItemWindowIDs = itemWindowIDs
         }
 
-        var items = MenuBarItem.getMenuBarItems(onScreenOnly: false, activeSpaceOnly: true)
+        var items = MenuBarItem.getMenuBarItems(onScreenOnly: false, activeSpaceOnly: false)
 
-        let hiddenControlItem = items.firstIndex(matching: .hiddenControlItem).map { items.remove(at: $0) }
-        let alwaysHiddenControlItem = items.firstIndex(matching: .alwaysHiddenControlItem).map { items.remove(at: $0) }
+        let hiddenWindowID = appState?.menuBarManager.section(withName: .hidden)?.controlItem.windowID
+        let alwaysHiddenWindowID = appState?.menuBarManager.section(withName: .alwaysHidden)?.controlItem.windowID
+
+        var hiddenControlItem: MenuBarItem?
+        if let hiddenWindowID, let index = items.firstIndex(where: { $0.windowID == hiddenWindowID }) {
+            hiddenControlItem = items.remove(at: index)
+        } else if let index = items.firstIndex(matching: .hiddenControlItem) {
+            hiddenControlItem = items.remove(at: index)
+        } else if let hiddenWindowID {
+            hiddenControlItem = MenuBarItem(windowID: hiddenWindowID)
+        }
+
+        var alwaysHiddenControlItem: MenuBarItem?
+        if let alwaysHiddenWindowID, let index = items.firstIndex(where: { $0.windowID == alwaysHiddenWindowID }) {
+            alwaysHiddenControlItem = items.remove(at: index)
+        } else if let index = items.firstIndex(matching: .alwaysHiddenControlItem) {
+            alwaysHiddenControlItem = items.remove(at: index)
+        } else if let alwaysHiddenWindowID {
+            alwaysHiddenControlItem = MenuBarItem(windowID: alwaysHiddenWindowID)
+        }
 
         guard let hiddenControlItem else {
-            Logger.itemManager.warning("Missing control item for hidden section")
-            Logger.itemManager.debug("Clearing menu bar item cache")
-            itemCache.clear()
+            Logger.itemManager.warning("Missing control item for hidden section, retaining existing cache")
             return
         }
 
@@ -359,8 +380,6 @@ extension MenuBarItemManager {
             )
         } catch {
             Logger.itemManager.error("Error enforcing control item order: \(error)")
-            Logger.itemManager.debug("Clearing menu bar item cache")
-            itemCache.clear()
         }
     }
 }

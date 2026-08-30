@@ -58,7 +58,7 @@ struct AboutSettingsPane: View {
             Spacer(minLength: 0)
                 .frame(maxHeight: 20)
 
-            updatesSection
+            forkAttributionSection
                 .layoutPriority(1)
         }
         .scrollDisabled(true)
@@ -78,8 +78,8 @@ struct AboutSettingsPane: View {
                 }
 
                 VStack(alignment: .leading) {
-                    Text("Ice")
-                        .font(.system(size: 72, weight: .medium))
+                    Text("MenuWrangler")
+                        .font(.system(size: 54, weight: .medium))
                         .foregroundStyle(.primary)
 
                     Text("Version \(Constants.versionString)")
@@ -95,63 +95,42 @@ struct AboutSettingsPane: View {
     }
 
     @ViewBuilder
-    private var updatesSection: some View {
-        IceSection(options: .hasDividers) {
-            automaticallyCheckForUpdates
-            automaticallyDownloadUpdates
-            if updatesManager.canCheckForUpdates {
-                checkForUpdates
+    private var forkAttributionSection: some View {
+        IceSection(options: .plain) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("About MenuWrangler")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+
+                Text("MenuWrangler is an enhanced macOS menu bar management utility derived as a fork of the open-source Ice project created by Jordan Baird.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+
+                HStack {
+                    Button("Original Ice Project on GitHub") {
+                        openURL(URL(string: "https://github.com/jordanbaird/Ice")!)
+                    }
+                    .buttonStyle(.link)
+                }
             }
+            .padding(12)
+            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .frame(maxWidth: 600)
     }
 
     @ViewBuilder
-    private var automaticallyCheckForUpdates: some View {
-        Toggle(
-            "Automatically check for updates",
-            isOn: updatesManager.bindings.automaticallyChecksForUpdates
-        )
-    }
-
-    @ViewBuilder
-    private var automaticallyDownloadUpdates: some View {
-        Toggle(
-            "Automatically download updates",
-            isOn: updatesManager.bindings.automaticallyDownloadsUpdates
-        )
-    }
-
-    @ViewBuilder
-    private var checkForUpdates: some View {
-        HStack {
-            Button("Check for Updates") {
-                updatesManager.checkForUpdates()
-            }
-            Spacer()
-            Text("Last checked: \(lastUpdateCheckString)")
-                .font(.caption)
-        }
-    }
-
-    @ViewBuilder
     private var bottomBar: some View {
         HStack {
-            Button("Quit Ice") {
+            Button("Quit MenuWrangler") {
                 NSApp.terminate(nil)
             }
             Spacer()
             Button("Acknowledgements") {
                 NSWorkspace.shared.open(acknowledgementsURL)
             }
-            Button("Contribute") {
+            Button("Ice Repository") {
                 openURL(contributeURL)
-            }
-            Button("Report a Bug") {
-                openURL(issuesURL)
-            }
-            Button("Support Ice", systemImage: "heart.circle.fill") {
-                openURL(donateURL)
             }
         }
         .padding(8)
