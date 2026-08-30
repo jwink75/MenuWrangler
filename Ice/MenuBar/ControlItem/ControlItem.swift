@@ -492,18 +492,8 @@ final class ControlItem {
 
         menu.addItem(.separator())
 
-        let checkForUpdatesItem = NSMenuItem(
-            title: "Check for Updates…",
-            action: #selector(checkForUpdates),
-            keyEquivalent: ""
-        )
-        checkForUpdatesItem.target = self
-        menu.addItem(checkForUpdatesItem)
-
-        menu.addItem(.separator())
-
         let quitItem = NSMenuItem(
-            title: "Quit Ice",
+            title: "Quit MenuWrangler",
             action: #selector(NSApp.terminate),
             keyEquivalent: "q"
         )
