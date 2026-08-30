@@ -13,8 +13,9 @@ struct LayoutItemInfo: Identifiable, Hashable {
     let ownerName: String
     let frame: CGRect
     let title: String
+    let isDelimiter: Bool
 
-    var isMovable: Bool { true }
+    var isMovable: Bool { !isDelimiter }
 
     func hash(into hasher: inout Hasher) {
         hasher.combine(windowID)

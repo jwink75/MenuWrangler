@@ -9,13 +9,14 @@ struct MenuBarLayoutSettingsPane: View {
     @EnvironmentObject var appState: AppState
 
     var body: some View {
-        if !ScreenCapture.cachedCheckPermissions() {
-            missingScreenRecordingPermission
-        } else if appState.menuBarManager.isMenuBarHiddenBySystemUserDefaults {
+        if appState.menuBarManager.isMenuBarHiddenBySystemUserDefaults {
             cannotArrange
         } else {
             IceForm(alignment: .leading, spacing: 20) {
                 header
+                if !ScreenCapture.cachedCheckPermissions() {
+                    permissionWarning
+                }
                 layoutBars
             }
         }
@@ -23,8 +24,16 @@ struct MenuBarLayoutSettingsPane: View {
 
     @ViewBuilder
     private var header: some View {
-        Text("Drag to arrange your menu bar items")
-            .font(.title2)
+        HStack {
+            Text("Drag to arrange your menu bar items")
+                .font(.title2)
+            Spacer()
+            Button("Refresh") {
+                WindowQuery.clearIconCache()
+                NotificationCenter.default.post(name: NSApplication.didBecomeActiveNotification, object: nil)
+            }
+            .buttonStyle(.borderless)
+        }
 
         IceGroupBox {
             AnnotationView(
@@ -37,6 +46,25 @@ struct MenuBarLayoutSettingsPane: View {
                     Image(systemName: "lightbulb")
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private var permissionWarning: some View {
+        IceGroupBox {
+            AnnotationView(
+                alignment: .center,
+                font: .callout.bold()
+            ) {
+                Label {
+                    Text("Screen recording permission is required to capture menu bar item icons. Items will display with fallback icons until granted.")
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle")
+                }
+            }
+        }
+        .onTapGesture {
+            appState.navigationState.settingsNavigationIdentifier = .advanced
         }
     }
 
@@ -57,33 +85,26 @@ struct MenuBarLayoutSettingsPane: View {
     }
 
     @ViewBuilder
-    private var missingScreenRecordingPermission: some View {
-        VStack {
-            Text("Menu bar layout requires screen recording permissions")
-                .font(.title2)
-
-            Button {
-                appState.navigationState.settingsNavigationIdentifier = .advanced
-            } label: {
-                Text("Go to Advanced Settings")
-            }
-            .buttonStyle(.link)
-        }
-    }
-
-    @ViewBuilder
     private func layoutBar(for section: MenuBarSection.Name) -> some View {
-        if
-            let section = appState.menuBarManager.section(withName: section),
-            section.isEnabled
-        {
+        if let section = appState.menuBarManager.section(withName: section) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("\(section.name.displayString) Section")
+                Text("\(section.name.displayString) Section (enabled=\(section.isEnabled))")
                     .font(.system(size: 14))
                     .padding(.leading, 2)
 
-                DirectQueryLayoutBar(section: section)
+                if section.isEnabled {
+                    DirectQueryLayoutBar(section: section)
+                } else {
+                    Text("Section not enabled")
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 12)
+                        .frame(height: 32)
+                }
             }
+        } else {
+            Text("\(section.displayString) Section (not found)")
+                .font(.system(size: 14))
+                .foregroundStyle(.red)
         }
     }
 }
