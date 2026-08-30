@@ -422,10 +422,10 @@ final class ControlItem {
             return hotkeySettingsManager.hotkey(withAction: action)
         }
 
-        let menu = NSMenu(title: "Ice")
+        let menu = NSMenu(title: "MenuWrangler")
 
         let settingsItem = NSMenuItem(
-            title: "Ice Settings…",
+            title: "MenuWrangler Settings…",
             action: #selector(AppDelegate.openSettingsWindow),
             keyEquivalent: ","
         )

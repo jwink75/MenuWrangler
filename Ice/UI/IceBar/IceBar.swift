@@ -25,7 +25,7 @@ final class IceBarPanel: NSPanel {
             defer: false
         )
         self.appState = appState
-        self.title = "Ice Bar"
+        self.title = "MenuWrangler Bar"
         self.titlebarAppearsTransparent = true
         self.isMovableByWindowBackground = true
         self.allowsToolTipsWhenApplicationIsInactive = true
@@ -317,14 +317,14 @@ private struct IceBarContentView: View {
                     appState.navigationState.settingsNavigationIdentifier = .advanced
                     appState.appDelegate?.openSettingsWindow()
                 } label: {
-                    Text("Open Ice Settings")
+                    Text("Open MenuWrangler Settings")
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.link)
             }
             .padding(.horizontal, 10)
         } else if menuBarManager.isMenuBarHiddenBySystemUserDefaults {
-            Text("Ice cannot display menu bar items for automatically hidden menu bars")
+            Text("MenuWrangler cannot display menu bar items for automatically hidden menu bars")
                 .padding(.horizontal, 10)
         } else if imageCache.cacheFailed(for: section) {
             Text("Unable to display menu bar items")

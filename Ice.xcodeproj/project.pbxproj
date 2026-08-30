@@ -24,7 +24,7 @@
 				Info.plist,
 				Resources/Acknowledgements.rtf,
 			);
-			target = 716683292A767E6A006ABF84 /* Ice */;
+			target = 716683292A767E6A006ABF84 /* MenuWrangler */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -66,9 +66,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		716683292A767E6A006ABF84 /* Ice */ = {
+		716683292A767E6A006ABF84 /* MenuWrangler */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 716683392A767E6B006ABF84 /* Build configuration list for PBXNativeTarget "Ice" */;
+			buildConfigurationList = 716683392A767E6B006ABF84 /* Build configuration list for PBXNativeTarget "MenuWrangler" */;
 			buildPhases = (
 				716683262A767E6A006ABF84 /* Sources */,
 				716683272A767E6A006ABF84 /* Frameworks */,
@@ -82,7 +82,7 @@
 			fileSystemSynchronizedGroups = (
 				71BDFBE12C978E2A00EF145F /* Ice */,
 			);
-			name = Ice;
+			name = MenuWrangler;
 			packageProductDependencies = (
 				175061902B1543DD003144CD /* LaunchAtLogin */,
 				1787C4262B16890B002F50DF /* AXSwift */,
@@ -127,7 +127,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				716683292A767E6A006ABF84 /* Ice */,
+				716683292A767E6A006ABF84 /* MenuWrangler */,
 			);
 		};
 /* End PBXProject section */
@@ -370,7 +370,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		716683392A767E6B006ABF84 /* Build configuration list for PBXNativeTarget "Ice" */ = {
+		716683392A767E6B006ABF84 /* Build configuration list for PBXNativeTarget "MenuWrangler" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				7166833A2A767E6B006ABF84 /* Debug */,
