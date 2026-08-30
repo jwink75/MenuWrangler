@@ -82,8 +82,7 @@ struct MenuBarLayoutSettingsPane: View {
                     .font(.system(size: 14))
                     .padding(.leading, 2)
 
-                LayoutBar(section: section)
-                    .environmentObject(appState.imageCache)
+                DirectQueryLayoutBar(section: section)
             }
         }
     }
