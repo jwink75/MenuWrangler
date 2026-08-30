@@ -189,17 +189,30 @@ final class MenuBarManager: ObservableObject {
                     var items = MenuBarItem.getMenuBarItems(on: displayID, onScreenOnly: false, activeSpaceOnly: true)
 
                     // Filter the items down according to the currently enabled/shown sections.
+                    let hiddenWinID = self.section(withName: .hidden)?.controlItem.windowID
+                    let alwaysHiddenWinID = self.section(withName: .alwaysHidden)?.controlItem.windowID
+
                     if
-                        let alwaysHiddenSection = section(withName: .alwaysHidden),
+                        let alwaysHiddenSection = self.section(withName: .alwaysHidden),
                         alwaysHiddenSection.isEnabled
                     {
                         if alwaysHiddenSection.controlItem.state == .hideItems {
-                            if let alwaysHiddenControlItem = items.firstIndex(matching: .alwaysHiddenControlItem).map({ items.remove(at: $0) }) {
+                            let alwaysHiddenControlItem = items.first(where: { item in
+                                if let alwaysHiddenWinID, item.windowID == alwaysHiddenWinID { return true }
+                                return item.info.title == ControlItem.Identifier.alwaysHidden.rawValue
+                            })
+                            if let alwaysHiddenControlItem {
+                                items.removeAll(where: { $0.windowID == alwaysHiddenControlItem.windowID })
                                 items.trimPrefix { $0.frame.maxX <= alwaysHiddenControlItem.frame.minX }
                             }
                         }
                     } else {
-                        if let hiddenControlItem = items.firstIndex(matching: .hiddenControlItem).map({ items.remove(at: $0) }) {
+                        let hiddenControlItem = items.first(where: { item in
+                            if let hiddenWinID, item.windowID == hiddenWinID { return true }
+                            return item.info.title == ControlItem.Identifier.hidden.rawValue
+                        })
+                        if let hiddenControlItem {
+                            items.removeAll(where: { $0.windowID == hiddenControlItem.windowID })
                             items.trimPrefix { $0.frame.maxX <= hiddenControlItem.frame.minX }
                         }
                     }
