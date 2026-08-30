@@ -133,11 +133,33 @@ extension Bridging {
             &list,
             &realCount
         )
-        guard result == .success else {
-            Logger.bridging.error("CGSGetProcessMenuBarWindowList failed with error \(result.logString)")
-            return []
+        if result == .success && realCount > 0 {
+            return [CGWindowID](list[..<Int(realCount)])
         }
-        return [CGWindowID](list[..<Int(realCount)])
+
+        // Fallback Window Discovery: Query CGWindowListCopyWindowInfo for status item windows (layer 25 / menu bar level)
+        if let windowListInfo = CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID) as? [[String: Any]] {
+            let fallbackIDs: [CGWindowID] = windowListInfo.compactMap { info in
+                guard
+                    let layer = info[kCGWindowLayer as String] as? Int,
+                    layer == 25 || layer == kCGMainMenuWindowLevel,
+                    let windowNumber = info[kCGWindowNumber as String] as? Int,
+                    let windowID = CGWindowID(exactly: windowNumber)
+                else {
+                    return nil
+                }
+                return windowID
+            }
+            if !fallbackIDs.isEmpty {
+                Logger.bridging.info("Discovered \(fallbackIDs.count) menu bar windows via CGWindowList fallback")
+                return fallbackIDs
+            }
+        }
+
+        if result != .success {
+            Logger.bridging.error("CGSGetProcessMenuBarWindowList failed with error \(result.logString)")
+        }
+        return []
     }
 
     private static func getOnScreenMenuBarWindowList() -> [CGWindowID] {
