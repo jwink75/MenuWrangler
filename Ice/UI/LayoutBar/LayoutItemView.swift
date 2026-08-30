@@ -15,9 +15,13 @@ struct LayoutItemView: View {
             .frame(width: 24, height: 24)
             .padding(4)
             .background(
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.secondary.opacity(0.1))
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.primary.opacity(0.06))
             )
-            .help(item.ownerName)
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color.primary.opacity(0.12), lineWidth: 0.5)
+            )
+            .help(item.ownerName.isEmpty ? "Menu Bar Item" : item.ownerName)
     }
 }

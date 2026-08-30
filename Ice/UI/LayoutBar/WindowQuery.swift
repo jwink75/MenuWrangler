@@ -48,14 +48,18 @@ enum WindowQuery {
 
     private static func createFallbackImage(for windowID: CGWindowID, ownerPID: pid_t, ownerName: String, title: String, frame: CGRect) -> NSImage {
         if let cgImage = ScreenCapture.captureWindow(windowID, screenBounds: frame, option: .boundsIgnoreFraming),
-           cgImage.width > 0 && cgImage.height > 0 {
-            let img = NSImage(cgImage: cgImage, size: NSSize(width: CGFloat(cgImage.width) / (NSScreen.main?.backingScaleFactor ?? 2), height: CGFloat(cgImage.height) / (NSScreen.main?.backingScaleFactor ?? 2)))
+           cgImage.width > 0 && cgImage.height > 0,
+           cgImage.hasVisiblePixels {
+            let scale = NSScreen.main?.backingScaleFactor ?? 2
+            let img = NSImage(cgImage: cgImage, size: NSSize(width: CGFloat(cgImage.width) / scale, height: CGFloat(cgImage.height) / scale))
             return img
         }
 
         if let cgImage = CGWindowListCreateImage(.null, .optionIncludingWindow, windowID, .boundsIgnoreFraming),
-           cgImage.width > 0 && cgImage.height > 0 {
-            let img = NSImage(cgImage: cgImage, size: NSSize(width: CGFloat(cgImage.width) / (NSScreen.main?.backingScaleFactor ?? 2), height: CGFloat(cgImage.height) / (NSScreen.main?.backingScaleFactor ?? 2)))
+           cgImage.width > 0 && cgImage.height > 0,
+           cgImage.hasVisiblePixels {
+            let scale = NSScreen.main?.backingScaleFactor ?? 2
+            let img = NSImage(cgImage: cgImage, size: NSSize(width: CGFloat(cgImage.width) / scale, height: CGFloat(cgImage.height) / scale))
             return img
         }
 

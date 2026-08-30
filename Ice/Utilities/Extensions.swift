@@ -160,6 +160,11 @@ extension CGImage {
         )
     }
 
+    /// Returns true if the image contains non-transparent pixels.
+    var hasVisiblePixels: Bool {
+        averageColor(alphaThreshold: 0.05) != nil
+    }
+
     // MARK: Trim Transparent Pixels
 
     /// A context for handling transparency data in an image.
