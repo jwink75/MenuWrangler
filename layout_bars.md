@@ -215,13 +215,19 @@ Do not discard menu bar items with empty titles. Include them in the enumeration
 
 ---
 
-## Recommended Implementation Order
+---
 
-Given that upstream Ice is in active development and these issues are tracked in [#6](https://github.com/jordanbaird/Ice/issues/6) and [#26](https://github.com/jordanbaird/Ice/issues/26), the suggested implementation order is:
+# Implementation Status Summary
 
-1. **Fixes 1, 3, 4, 5** — Contained, low-risk changes that do not depend on upstream changes. Can be applied immediately to a fork.
-2. **Fix 2** — Requires deeper architectural changes to the window discovery and caching pipeline. Either propose upstream or maintain a long-lived fork branch.
-3. **Fix 6** — Requires runtime detection and alternate code paths for modern macOS SDK enforcement.
-4. **Fix 7** — Purely a build/process issue. Resolve with scripts and documentation.
+| Fix | Status | Resolution Details |
+|---|---|---|
+| **1. Solid White Rectangle (`NaN` Color)** | **Resolved ✅** | Added `guard includedPixelCount > 0 else { return nil }` in `averageColor(makeOpaque:)` (`Extensions.swift`) to prevent zero-alpha division. |
+| **2A. Title-Independent Delimiter Lookup** | **Resolved ✅** | Updated `MenuBarItemManager.swift` and `MenuBarManager.swift` to match delimiters by known `windowID` and `owningApplication == .current`, falling back to `MenuBarItem(windowID:)` without relying on window titles. |
+| **2B. Non-Destructive Cache Handling** | **Resolved ✅** | Retains existing `ItemCache` state across transient window observation drops; added `ItemCache.isEmpty` and removed destructive `clear()` on transient observation drops. |
+| **2C. Relax Title Filtering** | **Resolved ✅** | Removed empty title filtering in `MenuBarItem.getMenuBarItems()` so anonymized status bar windows are preserved. |
+| **3. Delimiter Frame Collapsing & Partitioning** | **Resolved ✅** | Updated `Predicates.swift` section predicates (`isInVisibleSection`, `isInHiddenSection`, `isInAlwaysHiddenSection`) to use directional boundary comparisons that properly handle zero-width delimiter frames when section dividers are hidden. |
+| **4. UI View Hierarchy Bypass (`cacheFailed`)** | **Resolved ✅** | Removed the blocking `imageCache.cacheFailed` gate in `LayoutBar.swift` so `Representable` is always mounted, ensuring views populate asynchronously as captures complete. |
+| **5. Auto Layout Dimension Collapse** | **Resolved ✅** | Added explicit vertical boundary constraints (`topAnchor`/`bottomAnchor`) in `LayoutBarPaddingView.swift` and enforced a minimum height in `LayoutBarContainer.swift`. |
+| **6. SDK Runtime Discrepancy & Fallbacks** | **Resolved ✅** | Configured `activeSpaceOnly: false` window discovery, added AppKit icon and SF Symbol fallbacks (`NSRunningApplication.icon`, system symbols for Wi-Fi, battery, clock, audio) in `LayoutBarItemView.swift` when screen capture buffers are unpopulated. |
+| **7. Gatekeeper & Build Integrity** | **Resolved ✅** | Removed pre-compiled Sparkle binaries, scrubbed Dropbox conflict files, and created automated build/sign/deploy script (`scripts/build.sh`) with deep code signing and quarantine attribute stripping. |
 
-If the scope of these changes proves too large to maintain as patches against upstream, starting a new project from scratch — using Ice's open-source code as a reference but with a modernized architecture designed for current macOS restrictions from the ground up — is a viable alternative.
