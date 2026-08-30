@@ -63,10 +63,10 @@ final class ControlItem {
 
     /// The identifier of the control item's window.
     var windowID: CGWindowID? {
-        guard let window, window.windowNumber > 0 else {
+        guard let window, window.windowNumber > 0, let id = CGWindowID(exactly: window.windowNumber) else {
             return nil
         }
-        return CGWindowID(window.windowNumber)
+        return id
     }
 
     /// A Boolean value that indicates whether the control item serves as

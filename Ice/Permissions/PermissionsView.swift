@@ -175,16 +175,22 @@ struct PermissionsView: View {
 
                 if !permission.isRequired {
                     IceGroupBox {
-                        AnnotationView(
-                            alignment: .center,
-                            font: .callout.bold()
-                        ) {
-                            Label {
-                                Text("MenuWrangler can work in a limited mode without this permission.")
-                            } icon: {
-                                Image(systemName: "checkmark.shield")
-                                    .foregroundStyle(.green)
+                        VStack(spacing: 6) {
+                            AnnotationView(
+                                alignment: .center,
+                                font: .callout.bold()
+                            ) {
+                                Label {
+                                    Text("MenuWrangler can work in a limited mode without this permission.")
+                                } icon: {
+                                    Image(systemName: "checkmark.shield")
+                                        .foregroundStyle(.green)
+                                }
                             }
+                            Text("Note: macOS requires quitting and reopening the app after granting Screen Recording for the change to take effect.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
                         }
                     }
                 }
