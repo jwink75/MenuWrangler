@@ -36,12 +36,9 @@ enum ScreenCapture {
 
     /// Requests screen capture permissions.
     static func requestPermissions() {
-        if #available(macOS 15.0, *) {
-            // CGRequestScreenCaptureAccess() is broken on macOS 15. SCShareableContent requires
-            // screen capture permissions, and triggers a request if the user doesn't have them.
+        CGRequestScreenCaptureAccess()
+        if #available(macOS 14.0, *) {
             SCShareableContent.getWithCompletionHandler { _, _ in }
-        } else {
-            CGRequestScreenCaptureAccess()
         }
     }
 
