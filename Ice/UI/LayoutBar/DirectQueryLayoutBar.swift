@@ -50,8 +50,19 @@ struct DirectQueryLayoutBar: View {
                 .stroke(.quaternary, lineWidth: 0.5)
         )
         .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                refreshItems()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                if let hiddenSection = appState.menuBarManager.section(withName: .hidden), hiddenSection.isHidden {
+                    hiddenSection.show()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        _ = WindowQuery.getMenuBarWindows()
+                        hiddenSection.hide()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            refreshItems()
+                        }
+                    }
+                } else {
+                    refreshItems()
+                }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in

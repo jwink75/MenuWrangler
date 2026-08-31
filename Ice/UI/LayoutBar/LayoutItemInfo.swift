@@ -51,28 +51,37 @@ struct LayoutItemInfo: Identifiable, Hashable {
             return "AirDrop"
         }
 
-        // 3. Try Accessibility query (direct point or full Control Center AX tree)
+        // 3. Check persistent title cache
+        if let cached = LayoutItemInfo.cachedTitle(for: windowID) {
+            return cached
+        }
+
+        // 4. Try Accessibility query (direct point or full Control Center AX tree)
         if let axName = LayoutItemInfo.queryAccessibilityName(for: frame, windowID: windowID),
            !axName.isEmpty && !genericTitles.contains(axName) && axName != "Control Center" && axName != "ControlCenter" {
+            LayoutItemInfo.recordTitle(axName, for: windowID)
             return axName
         }
 
-        // 4. Check MenuBarItem displayName from legacy introspection
+        // 5. Check MenuBarItem displayName from legacy introspection
         if let legacyDisplayName = MenuBarItem(windowID: windowID)?.displayName,
            legacyDisplayName != "Unknown" && legacyDisplayName != "ControlCenter" && legacyDisplayName != "Control Center" && !genericTitles.contains(legacyDisplayName) {
+            LayoutItemInfo.recordTitle(legacyDisplayName, for: windowID)
             return legacyDisplayName
         }
 
-        // 5. Resolve via NSRunningApplication localizedName
+        // 6. Resolve via NSRunningApplication localizedName
         if let app = NSRunningApplication(processIdentifier: ownerPID),
            let localizedName = app.localizedName,
            !localizedName.isEmpty,
            localizedName != "ControlCenter" && localizedName != "Control Center" && localizedName != "Window Server" {
+            LayoutItemInfo.recordTitle(localizedName, for: windowID)
             return localizedName
         }
 
-        // 6. Fall back to owner name if valid and not a system host
+        // 7. Fall back to owner name if valid and not a system host
         if !ownerName.isEmpty && ownerName != "Unknown" && ownerName != "ControlCenter" && ownerName != "Control Center" && ownerName != "Window Server" {
+            LayoutItemInfo.recordTitle(ownerName, for: windowID)
             return ownerName
         }
 
@@ -81,6 +90,22 @@ struct LayoutItemInfo: Identifiable, Hashable {
         }
 
         return "Item #\(windowID % 1000)"
+    }
+
+    private static var titleCache: [CGWindowID: String] = [:]
+    private static let titleCacheLock = NSLock()
+
+    static func recordTitle(_ title: String, for windowID: CGWindowID) {
+        guard !title.isEmpty, !title.hasPrefix("Item-"), !title.hasPrefix("BentoBox"), title != "Control Center" else { return }
+        titleCacheLock.lock()
+        titleCache[windowID] = title
+        titleCacheLock.unlock()
+    }
+
+    static func cachedTitle(for windowID: CGWindowID) -> String? {
+        titleCacheLock.lock()
+        defer { titleCacheLock.unlock() }
+        return titleCache[windowID]
     }
 
     private static func queryAccessibilityName(for frame: CGRect, windowID: CGWindowID) -> String? {
