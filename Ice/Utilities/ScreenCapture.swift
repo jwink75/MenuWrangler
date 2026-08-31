@@ -67,7 +67,11 @@ enum ScreenCapture {
         guard let windowArray = CFArrayCreate(kCFAllocatorDefault, pointer, windowIDs.count, nil) else {
             return nil
         }
-        return .windowListImage(from: screenBounds ?? .null, windowArray: windowArray, imageOption: option)
+        return CGImage(
+            windowListFromArrayScreenBounds: screenBounds ?? .null,
+            windowArray: windowArray,
+            imageOption: option
+        )
     }
 
     /// Captures an image of a window.
@@ -80,19 +84,3 @@ enum ScreenCapture {
         captureWindows([windowID], screenBounds: screenBounds, option: option)
     }
 }
-
-/// A protocol used to suppress deprecation warnings for the `CGWindowList` screen capture APIs.
-///
-/// ScreenCaptureKit doesn't support capturing composite images of offscreen menu bar items, but
-/// this should be replaced once it does.
-private protocol WindowListImage {
-    init?(windowListFromArrayScreenBounds: CGRect, windowArray: CFArray, imageOption: CGWindowImageOption)
-}
-
-private extension WindowListImage {
-    static func windowListImage(from screenBounds: CGRect, windowArray: CFArray, imageOption: CGWindowImageOption) -> Self? {
-        Self(windowListFromArrayScreenBounds: screenBounds, windowArray: windowArray, imageOption: imageOption)
-    }
-}
-
-extension CGImage: WindowListImage { }

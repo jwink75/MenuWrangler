@@ -28,6 +28,13 @@ struct LayoutItemInfo: Identifiable, Hashable {
             return title
         }
 
+        // 2. Check MenuBarItem displayName from legacy introspection
+        if let legacyDisplayName = MenuBarItem(windowID: windowID)?.displayName,
+           legacyDisplayName != "Unknown" && legacyDisplayName != "ControlCenter" && legacyDisplayName != "Control Center" && !genericTitles.contains(legacyDisplayName) {
+            return legacyDisplayName
+        }
+
+        // 3. Resolve via NSRunningApplication localizedName
         if let app = NSRunningApplication(processIdentifier: ownerPID),
            let localizedName = app.localizedName,
            !localizedName.isEmpty,
@@ -35,11 +42,12 @@ struct LayoutItemInfo: Identifiable, Hashable {
             return localizedName
         }
 
+        // 4. Fall back to owner name if valid and not a system host
         if !ownerName.isEmpty && ownerName != "Unknown" && ownerName != "ControlCenter" && ownerName != "Window Server" {
             return ownerName
         }
 
-        // Check title-based system keywords
+        // 5. Check title-based system keywords
         let titleLower = title.lowercased()
         if titleLower.contains("wifi") || titleLower.contains("wi-fi") {
             return "Wi-Fi"
@@ -61,8 +69,12 @@ struct LayoutItemInfo: Identifiable, Hashable {
             return "AirDrop"
         }
 
-        if ownerName == "ControlCenter" {
+        if title.hasPrefix("BentoBox") || titleLower == "bentobox" {
             return "Control Center"
+        }
+
+        if ownerName == "ControlCenter" {
+            return "Item #\(windowID % 1000)"
         }
 
         return "Status Item"

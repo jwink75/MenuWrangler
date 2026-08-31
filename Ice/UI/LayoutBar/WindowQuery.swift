@@ -121,19 +121,26 @@ enum WindowQuery {
         title: String,
         frame: CGRect
     ) -> NSImage {
-        // 1. Try live screen capture first
-        if let cgImage = ScreenCapture.captureWindow(windowID, screenBounds: frame, option: .boundsIgnoreFraming),
+        let scale = NSScreen.main?.backingScaleFactor ?? 2
+
+        // 1. Try live screen capture with nil bounds (.null - derives minimal enclosing rectangle)
+        if let cgImage = ScreenCapture.captureWindow(windowID, screenBounds: nil, option: .boundsIgnoreFraming),
            cgImage.width > 0 && cgImage.height > 0,
            cgImage.hasVisiblePixels {
-            let scale = NSScreen.main?.backingScaleFactor ?? 2
             return NSImage(cgImage: cgImage, size: NSSize(width: CGFloat(cgImage.width) / scale, height: CGFloat(cgImage.height) / scale))
         }
 
-        // 2. Try CGWindowListCreateImage as fallback
+        // 2. Try live screen capture with explicit frame bounds
+        if let cgImage = ScreenCapture.captureWindow(windowID, screenBounds: frame, option: .boundsIgnoreFraming),
+           cgImage.width > 0 && cgImage.height > 0,
+           cgImage.hasVisiblePixels {
+            return NSImage(cgImage: cgImage, size: NSSize(width: CGFloat(cgImage.width) / scale, height: CGFloat(cgImage.height) / scale))
+        }
+
+        // 3. Try CGWindowListCreateImage as fallback
         if let cgImage = CGWindowListCreateImage(.null, .optionIncludingWindow, windowID, .boundsIgnoreFraming),
            cgImage.width > 0 && cgImage.height > 0,
            cgImage.hasVisiblePixels {
-            let scale = NSScreen.main?.backingScaleFactor ?? 2
             return NSImage(cgImage: cgImage, size: NSSize(width: CGFloat(cgImage.width) / scale, height: CGFloat(cgImage.height) / scale))
         }
 
