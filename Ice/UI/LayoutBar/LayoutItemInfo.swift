@@ -51,8 +51,8 @@ struct LayoutItemInfo: Identifiable, Hashable {
             return "AirDrop"
         }
 
-        // 3. Try Accessibility query
-        if let axName = LayoutItemInfo.queryAccessibilityName(for: frame),
+        // 3. Try Accessibility query (direct point or full Control Center AX tree)
+        if let axName = LayoutItemInfo.queryAccessibilityName(for: frame, windowID: windowID),
            !axName.isEmpty && !genericTitles.contains(axName) && axName != "Control Center" && axName != "ControlCenter" {
             return axName
         }
@@ -83,22 +83,63 @@ struct LayoutItemInfo: Identifiable, Hashable {
         return "Item #\(windowID % 1000)"
     }
 
-    private static func queryAccessibilityName(for frame: CGRect) -> String? {
+    private static func queryAccessibilityName(for frame: CGRect, windowID: CGWindowID) -> String? {
+        let genericTitles: Set<String> = [
+            "Item-0", "Item-1", "Item-2", "Item-3", "Item-4", "Item-5", "Item-6", "Item-7", "Item-8", "Item-9",
+            "BentoBox-0", "BentoBox", "Window Server", "Main Status Menu", "StatusItem", "Control Center", "ControlCenter"
+        ]
+
+        // 1. Direct point query for on-screen items
         let point = CGPoint(x: frame.midX, y: frame.midY)
-        var element: AXUIElement?
-        guard AXUIElementCopyElementAtPosition(AXUIElementCreateSystemWide(), Float(point.x), Float(point.y), &element) == .success,
-              let element else {
+        if point.x > 0 {
+            var element: AXUIElement?
+            if AXUIElementCopyElementAtPosition(AXUIElementCreateSystemWide(), Float(point.x), Float(point.y), &element) == .success,
+               let element {
+                var value: CFTypeRef?
+                if AXUIElementCopyAttributeValue(element, kAXDescriptionAttribute as CFString, &value) == .success,
+                   let desc = value as? String, !desc.isEmpty && !genericTitles.contains(desc) {
+                    return desc
+                }
+                if AXUIElementCopyAttributeValue(element, kAXTitleAttribute as CFString, &value) == .success,
+                   let title = value as? String, !title.isEmpty && !genericTitles.contains(title) {
+                    return title
+                }
+            }
+        }
+
+        // 2. Query Control Center AX application hierarchy
+        guard let controlCenter = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.controlcenter").first else {
             return nil
         }
-        var value: CFTypeRef?
-        if AXUIElementCopyAttributeValue(element, kAXDescriptionAttribute as CFString, &value) == .success,
-           let desc = value as? String, !desc.isEmpty {
-            return desc
+        let appAX = AXUIElementCreateApplication(controlCenter.processIdentifier)
+        var childrenRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(appAX, kAXChildrenAttribute as CFString, &childrenRef) == .success,
+              let children = childrenRef as? [AXUIElement] else {
+            return nil
         }
-        if AXUIElementCopyAttributeValue(element, kAXTitleAttribute as CFString, &value) == .success,
-           let title = value as? String, !title.isEmpty {
-            return title
+
+        for child in children {
+            var subChildrenRef: CFTypeRef?
+            if AXUIElementCopyAttributeValue(child, kAXChildrenAttribute as CFString, &subChildrenRef) == .success,
+               let subChildren = subChildrenRef as? [AXUIElement] {
+                for item in subChildren {
+                    var descRef: CFTypeRef?
+                    if AXUIElementCopyAttributeValue(item, kAXDescriptionAttribute as CFString, &descRef) == .success,
+                       let desc = descRef as? String, !desc.isEmpty && !genericTitles.contains(desc) {
+                        return desc
+                    }
+                    if AXUIElementCopyAttributeValue(item, kAXTitleAttribute as CFString, &descRef) == .success,
+                       let title = descRef as? String, !title.isEmpty && !genericTitles.contains(title) {
+                        return title
+                    }
+                    if AXUIElementCopyAttributeValue(item, kAXHelpAttribute as CFString, &descRef) == .success,
+                       let help = descRef as? String, !help.isEmpty && !genericTitles.contains(help) {
+                        return help
+                    }
+                }
+            }
         }
+
         return nil
     }
 
