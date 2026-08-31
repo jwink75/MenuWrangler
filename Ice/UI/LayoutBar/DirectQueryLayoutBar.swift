@@ -27,12 +27,14 @@ struct DirectQueryLayoutBar: View {
                     .frame(height: 32)
                 }
                 ForEach(items) { item in
-                    LayoutItemView(item: item)
-                        .opacity(draggedItem?.id == item.id ? 0.5 : 1.0)
-                        .onDrag {
-                            self.draggedItem = item
-                            return NSItemProvider(object: String(item.windowID) as NSString)
-                        }
+                    LayoutItemView(item: item, onReorder: { draggedID, targetItem in
+                        reorderItem(draggedID: draggedID, targetItem: targetItem)
+                    })
+                    .opacity(draggedItem?.id == item.id ? 0.5 : 1.0)
+                    .onDrag {
+                        self.draggedItem = item
+                        return NSItemProvider(object: String(item.windowID) as NSString)
+                    }
                 }
             }
             .padding(.horizontal, 10)
@@ -118,13 +120,14 @@ struct DirectQueryLayoutBar: View {
         return true
     }
 
-    private func moveItem(windowID: CGWindowID, to section: MenuBarSection) {
+    private func moveItem(windowID: CGWindowID, to targetSection: MenuBarSection) {
         guard let item = MenuBarItem(windowID: windowID) else {
             draggedItem = nil
             return
         }
 
-        guard let hiddenWinID = appState.menuBarManager.section(withName: .hidden)?.controlItem.windowID,
+        guard let hiddenSection = appState.menuBarManager.section(withName: .hidden),
+              let hiddenWinID = hiddenSection.controlItem.windowID,
               let hiddenControlItem = MenuBarItem(windowID: hiddenWinID) else {
             draggedItem = nil
             return
@@ -132,26 +135,93 @@ struct DirectQueryLayoutBar: View {
 
         Task {
             do {
-                switch section.name {
+                let wasHiddenCollapsed = hiddenSection.isHidden
+                if wasHiddenCollapsed {
+                    await MainActor.run {
+                        hiddenSection.show()
+                    }
+                    try await Task.sleep(for: .milliseconds(150))
+                }
+
+                switch targetSection.name {
                 case .visible:
                     try await appState.itemManager.move(item: item, to: .rightOfItem(hiddenControlItem))
                 case .hidden:
                     try await appState.itemManager.move(item: item, to: .leftOfItem(hiddenControlItem))
                 case .alwaysHidden:
-                    if let alwaysHiddenWinID = appState.menuBarManager.section(withName: .alwaysHidden)?.controlItem.windowID,
+                    if let alwaysHiddenSection = appState.menuBarManager.section(withName: .alwaysHidden),
+                       let alwaysHiddenWinID = alwaysHiddenSection.controlItem.windowID,
                        let alwaysHiddenControlItem = MenuBarItem(windowID: alwaysHiddenWinID) {
                         try await appState.itemManager.move(item: item, to: .leftOfItem(alwaysHiddenControlItem))
                     }
                 }
+
+                if wasHiddenCollapsed {
+                    try await Task.sleep(for: .milliseconds(150))
+                    await MainActor.run {
+                        hiddenSection.hide()
+                    }
+                }
+
                 await MainActor.run {
                     self.draggedItem = nil
                     WindowQuery.clearIconCache()
                     self.refreshItems()
                 }
             } catch {
-                print("Failed to move item: \(error)")
+                print("[DirectQueryLayoutBar] Failed to move item: \(error)")
                 await MainActor.run {
                     self.draggedItem = nil
+                    self.refreshItems()
+                }
+            }
+        }
+    }
+
+    private func reorderItem(draggedID: CGWindowID, targetItem: LayoutItemInfo) {
+        guard let draggedMenuBarItem = MenuBarItem(windowID: draggedID),
+              let targetMenuBarItem = MenuBarItem(windowID: targetItem.windowID) else {
+            return
+        }
+
+        guard let hiddenSection = appState.menuBarManager.section(withName: .hidden) else {
+            return
+        }
+
+        Task {
+            do {
+                let wasHiddenCollapsed = hiddenSection.isHidden
+                if wasHiddenCollapsed {
+                    await MainActor.run {
+                        hiddenSection.show()
+                    }
+                    try await Task.sleep(for: .milliseconds(150))
+                }
+
+                if let draggedFrame = Bridging.getWindowFrame(for: draggedID),
+                   draggedFrame.origin.x < targetItem.frame.origin.x {
+                    try await appState.itemManager.move(item: draggedMenuBarItem, to: .rightOfItem(targetMenuBarItem))
+                } else {
+                    try await appState.itemManager.move(item: draggedMenuBarItem, to: .leftOfItem(targetMenuBarItem))
+                }
+
+                if wasHiddenCollapsed {
+                    try await Task.sleep(for: .milliseconds(150))
+                    await MainActor.run {
+                        hiddenSection.hide()
+                    }
+                }
+
+                await MainActor.run {
+                    self.draggedItem = nil
+                    WindowQuery.clearIconCache()
+                    self.refreshItems()
+                }
+            } catch {
+                print("[DirectQueryLayoutBar] Failed to reorder item: \(error)")
+                await MainActor.run {
+                    self.draggedItem = nil
+                    self.refreshItems()
                 }
             }
         }

@@ -7,6 +7,8 @@ import SwiftUI
 
 struct LayoutItemView: View {
     let item: LayoutItemInfo
+    var onReorder: ((CGWindowID, LayoutItemInfo) -> Void)? = nil
+    @State private var isTargeted = false
 
     var body: some View {
         VStack(spacing: 2) {
@@ -23,16 +25,30 @@ struct LayoutItemView: View {
         .padding(4)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(Color.primary.opacity(0.06))
+                .fill(isTargeted ? Color.accentColor.opacity(0.2) : Color.primary.opacity(0.06))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 6)
-                .stroke(Color.primary.opacity(0.12), lineWidth: 0.5)
+                .stroke(isTargeted ? Color.accentColor : Color.primary.opacity(0.12), lineWidth: isTargeted ? 1.5 : 0.5)
         )
         .help(item.resolvedTitle)
         .contentShape(Rectangle())
         .onDrag {
             NSItemProvider(object: "\(item.windowID)" as NSString)
+        }
+        .onDrop(of: [.text], isTargeted: $isTargeted) { providers in
+            guard let provider = providers.first else { return false }
+            provider.loadObject(ofClass: NSString.self) { (object, error) in
+                guard let windowIDString = object as? String,
+                      let draggedID = UInt32(windowIDString),
+                      draggedID != item.windowID else {
+                    return
+                }
+                DispatchQueue.main.async {
+                    onReorder?(draggedID, item)
+                }
+            }
+            return true
         }
     }
 }
