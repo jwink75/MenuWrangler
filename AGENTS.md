@@ -21,3 +21,4 @@ This project is developed as an **equal peer partnership** between two complemen
 - **Title-independent status item discovery**: Modern macOS (14/15/26) anonymizes window titles for non-system apps. Never rely on `item.title != nil` or string matches for critical control logic; use window IDs, geometric coordinates, and client process tracking.
 - **Resilient fallback rendering**: Always provide `NSRunningApplication.icon` or SF Symbols when screen capture returns `nil` or transparent buffers.
 - **Section partitioning**: Menu bar items must be partitioned spatially relative to delimiter coordinates.
+- **GitHub Policy**: Only push the project to GitHub when explicitly director to by the user to conserve tokens.

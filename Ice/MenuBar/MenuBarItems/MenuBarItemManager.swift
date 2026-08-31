@@ -1058,32 +1058,27 @@ extension MenuBarItemManager {
 
         lastItemMoveStartDate = .now
 
+        let isControlCenterProxied = (item.ownerName == "ControlCenter" || item.ownerName == "Control Center" || item.owningApplication?.bundleIdentifier == "com.apple.controlcenter")
+        let startLocation: EventTap.Location = isControlCenterProxied ? .sessionEventTap : .pid(item.ownerPID)
+
         do {
             try await scrombleEvent(
                 mouseDownEvent,
-                from: .pid(item.ownerPID),
+                from: startLocation,
                 to: .sessionEventTap,
                 waitingForFrameChangeOf: item
             )
             try await scrombleEvent(
                 mouseUpEvent,
-                from: .pid(item.ownerPID),
+                from: startLocation,
                 to: .sessionEventTap,
                 waitingForFrameChangeOf: item
             )
         } catch {
-            do {
-                Logger.itemManager.debug("Posting fallback event for moving \(item.logString)")
-                // Catch this, as we still want to throw the existing error if the fallback fails.
-                try await postEventAndWaitToReceive(
-                    fallbackEvent,
-                    to: .sessionEventTap,
-                    item: item
-                )
-            } catch {
-                Logger.itemManager.error("Failed to post fallback event for moving \(item.logString)")
-            }
-            throw error
+            Logger.itemManager.info("Posting direct HID events for \(item.logString)")
+            mouseDownEvent.post(tap: .cghidEventTap)
+            try? await Task.sleep(for: .milliseconds(60))
+            mouseUpEvent.post(tap: .cghidEventTap)
         }
     }
 
