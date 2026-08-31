@@ -107,7 +107,7 @@ struct LayoutItemInfo: Identifiable, Hashable {
             }
         }
 
-        // 2. Query Control Center AX application hierarchy
+        // 2. Query Control Center AX application hierarchy by matching position
         guard let controlCenter = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.controlcenter").first else {
             return nil
         }
@@ -123,18 +123,23 @@ struct LayoutItemInfo: Identifiable, Hashable {
             if AXUIElementCopyAttributeValue(child, kAXChildrenAttribute as CFString, &subChildrenRef) == .success,
                let subChildren = subChildrenRef as? [AXUIElement] {
                 for item in subChildren {
-                    var descRef: CFTypeRef?
-                    if AXUIElementCopyAttributeValue(item, kAXDescriptionAttribute as CFString, &descRef) == .success,
-                       let desc = descRef as? String, !desc.isEmpty && !genericTitles.contains(desc) {
-                        return desc
-                    }
-                    if AXUIElementCopyAttributeValue(item, kAXTitleAttribute as CFString, &descRef) == .success,
-                       let title = descRef as? String, !title.isEmpty && !genericTitles.contains(title) {
-                        return title
-                    }
-                    if AXUIElementCopyAttributeValue(item, kAXHelpAttribute as CFString, &descRef) == .success,
-                       let help = descRef as? String, !help.isEmpty && !genericTitles.contains(help) {
-                        return help
+                    var posRef: CFTypeRef?
+                    if AXUIElementCopyAttributeValue(item, kAXPositionAttribute as CFString, &posRef) == .success,
+                       let posRef {
+                        var axPoint = CGPoint.zero
+                        if AXValueGetValue(posRef as! AXValue, .cgPoint, &axPoint) {
+                            if abs(axPoint.x - frame.origin.x) < 10 {
+                                var descRef: CFTypeRef?
+                                if AXUIElementCopyAttributeValue(item, kAXDescriptionAttribute as CFString, &descRef) == .success,
+                                   let desc = descRef as? String, !desc.isEmpty && !genericTitles.contains(desc) {
+                                    return desc
+                                }
+                                if AXUIElementCopyAttributeValue(item, kAXTitleAttribute as CFString, &descRef) == .success,
+                                   let title = descRef as? String, !title.isEmpty && !genericTitles.contains(title) {
+                                    return title
+                                }
+                            }
+                        }
                     }
                 }
             }
