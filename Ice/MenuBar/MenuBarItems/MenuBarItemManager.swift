@@ -982,18 +982,27 @@ extension MenuBarItemManager {
             throw EventError(code: .eventCreationFailure, item: item)
         }
 
-        try await scrombleEvent(
-            mouseDownEvent,
-            from: .pid(item.ownerPID),
-            to: .sessionEventTap,
-            item: item
-        )
-        try await scrombleEvent(
-            mouseUpEvent,
-            from: .pid(item.ownerPID),
-            to: .sessionEventTap,
-            item: item
-        )
+        let isControlCenterProxied = (item.ownerName == "ControlCenter" || item.ownerName == "Control Center" || item.owningApplication?.bundleIdentifier == "com.apple.controlcenter")
+        let startLocation: EventTap.Location = isControlCenterProxied ? .sessionEventTap : .pid(item.ownerPID)
+
+        do {
+            try await scrombleEvent(
+                mouseDownEvent,
+                from: startLocation,
+                to: .sessionEventTap,
+                item: item
+            )
+            try await scrombleEvent(
+                mouseUpEvent,
+                from: startLocation,
+                to: .sessionEventTap,
+                item: item
+            )
+        } catch {
+            mouseDownEvent.post(tap: .cghidEventTap)
+            try? await Task.sleep(for: .milliseconds(40))
+            mouseUpEvent.post(tap: .cghidEventTap)
+        }
     }
 
     /// Moves a menu bar item to the given destination, without restoring the mouse
@@ -1093,15 +1102,6 @@ extension MenuBarItemManager {
             return
         }
 
-        do {
-            // Order of these waiters matters, as the modifiers could be released
-            // while the mouse is still moving.
-            try await waitForNoModifiersPressed()
-            try await waitForMouseToStopMoving()
-        } catch {
-            throw EventError(code: .couldNotComplete, item: item)
-        }
-
         Logger.itemManager.info("Moving \(item.logString) to \(destination.logString)")
 
         guard let appState else {
@@ -1126,9 +1126,8 @@ extension MenuBarItemManager {
             MouseCursor.show()
         }
 
-        // Item movement can occasionally fail. Retry up to a total of 5 attempts,
-        // throwing the last attempt's error if it fails.
-        for n in 1...5 {
+        // Retry up to 2 attempts max to prevent cursor freeze
+        for n in 1...2 {
             do {
                 try await moveItemWithoutRestoringMouseLocation(item, to: destination)
                 guard let newFrame = getCurrentFrame(for: item) else {
@@ -1140,9 +1139,9 @@ extension MenuBarItemManager {
                 } else {
                     throw EventError(code: .couldNotComplete, item: item)
                 }
-            } catch where n < 5 {
+            } catch where n < 2 {
                 Logger.itemManager.warning("Attempt \(n) to move \(item.logString) failed (error: \(error))")
-                try await wakeUpItem(item)
+                try? await wakeUpItem(item)
                 Logger.itemManager.info("Retrying move of \(item.logString)")
                 continue
             }

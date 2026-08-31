@@ -146,14 +146,6 @@ struct DirectQueryLayoutBar: View {
 
         Task {
             do {
-                let wasHiddenCollapsed = hiddenSection.isHidden
-                if wasHiddenCollapsed {
-                    await MainActor.run {
-                        hiddenSection.show()
-                    }
-                    try await Task.sleep(for: .milliseconds(150))
-                }
-
                 switch targetSection.name {
                 case .visible:
                     try await appState.itemManager.move(item: item, to: .rightOfItem(hiddenControlItem))
@@ -164,13 +156,6 @@ struct DirectQueryLayoutBar: View {
                        let alwaysHiddenWinID = alwaysHiddenSection.controlItem.windowID,
                        let alwaysHiddenControlItem = MenuBarItem(windowID: alwaysHiddenWinID) {
                         try await appState.itemManager.move(item: item, to: .leftOfItem(alwaysHiddenControlItem))
-                    }
-                }
-
-                if wasHiddenCollapsed {
-                    try await Task.sleep(for: .milliseconds(150))
-                    await MainActor.run {
-                        hiddenSection.hide()
                     }
                 }
 
@@ -195,32 +180,13 @@ struct DirectQueryLayoutBar: View {
             return
         }
 
-        guard let hiddenSection = appState.menuBarManager.section(withName: .hidden) else {
-            return
-        }
-
         Task {
             do {
-                let wasHiddenCollapsed = hiddenSection.isHidden
-                if wasHiddenCollapsed {
-                    await MainActor.run {
-                        hiddenSection.show()
-                    }
-                    try await Task.sleep(for: .milliseconds(150))
-                }
-
                 if let draggedFrame = Bridging.getWindowFrame(for: draggedID),
                    draggedFrame.origin.x < targetItem.frame.origin.x {
                     try await appState.itemManager.move(item: draggedMenuBarItem, to: .rightOfItem(targetMenuBarItem))
                 } else {
                     try await appState.itemManager.move(item: draggedMenuBarItem, to: .leftOfItem(targetMenuBarItem))
-                }
-
-                if wasHiddenCollapsed {
-                    try await Task.sleep(for: .milliseconds(150))
-                    await MainActor.run {
-                        hiddenSection.hide()
-                    }
                 }
 
                 await MainActor.run {
