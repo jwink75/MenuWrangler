@@ -9,6 +9,8 @@ struct LayoutItemView: View {
     let item: LayoutItemInfo
     var onReorder: ((CGWindowID, LayoutItemInfo) -> Void)? = nil
     @State private var isTargeted = false
+    
+    @AppStorage("MenuBarLayout_showItemLabels") private var showLabels: Bool = true
 
     var body: some View {
         HStack(spacing: 2) {
@@ -25,11 +27,13 @@ struct LayoutItemView: View {
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(width: 20, height: 20)
-                Text(item.resolvedTitle)
-                    .font(.system(size: 8, weight: .medium))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .frame(maxWidth: 54)
+                if showLabels {
+                    Text(item.resolvedTitle)
+                        .font(.system(size: 8, weight: .medium))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .frame(maxWidth: 54)
+                }
             }
             .padding(4)
             .background(
@@ -50,8 +54,8 @@ struct LayoutItemView: View {
             guard let provider = providers.first else { return false }
             provider.loadObject(ofClass: NSString.self) { (object, error) in
                 guard let windowIDString = object as? String,
-                      let draggedID = UInt32(windowIDString),
-                      draggedID != item.windowID else {
+                    let draggedID = UInt32(windowIDString),
+                    draggedID != item.windowID else {
                     return
                 }
                 DispatchQueue.main.async {

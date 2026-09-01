@@ -32,7 +32,7 @@ struct MenuBarLayoutSettingsPane: View {
 
             Button(action: {
                 WindowQuery.clearIconCache()
-                NotificationCenter.default.post(name: NSApplication.didBecomeActiveNotification, object: nil)
+                NotificationCenter.default.post(name: NSNotification.Name("MenuBarsNeedRefresh"), object: nil)
             }) {
                 Label("Refresh", systemImage: "arrow.clockwise")
             }
@@ -52,6 +52,18 @@ struct MenuBarLayoutSettingsPane: View {
                 }
             }
         }
+
+        HStack {
+            Toggle("Show item labels", isOn: Binding(
+                get: { UserDefaults.standard.bool(forKey: "MenuBarLayout_showItemLabels") },
+                set: { newValue in
+                    UserDefaults.standard.set(newValue, forKey: "MenuBarLayout_showItemLabels")
+                }
+            ))
+        }
+        .toggleStyle(.switch)
+        .font(.caption)
+        .padding(.horizontal, 2)
     }
 
     @ViewBuilder
