@@ -21,11 +21,13 @@ struct LayoutItemInfo: Identifiable, Hashable {
     var resolvedTitle: String {
         let genericTitles: Set<String> = [
             "Item-0", "Item-1", "Item-2", "Item-3", "Item-4", "Item-5", "Item-6", "Item-7", "Item-8", "Item-9",
-            "BentoBox-0", "BentoBox", "Window Server", "Main Status Menu", "StatusItem"
+            "BentoBox-0", "BentoBox", "Window Server", "Main Status Menu", "StatusItem",
+            "AXMenuBar", "AXMenu", "AXPopup", "AXButton", "AXGroup", "AXApplication",
+            "AXScrollArea", "AXMainGroup"
         ]
 
         // 1. If explicit custom title exists (and is not generic), use it
-        if !title.isEmpty && !genericTitles.contains(title) && !title.hasPrefix("Item-") && !title.hasPrefix("BentoBox-") {
+        if !title.isEmpty && !genericTitles.contains(title) && !title.hasPrefix("Item-") && !title.hasPrefix("BentoBox-") && !genericTitles.contains(where: { title.localizedCaseInsensitiveContains($0) }) {
             return title
         }
 
@@ -58,7 +60,7 @@ struct LayoutItemInfo: Identifiable, Hashable {
 
         // 4. Try Accessibility query (direct point or full Control Center AX tree)
         if let axName = LayoutItemInfo.queryAccessibilityName(for: frame, windowID: windowID),
-           !axName.isEmpty && !genericTitles.contains(axName) && axName != "Control Center" && axName != "ControlCenter" {
+           !axName.isEmpty && !genericTitles.contains(axName) && !genericTitles.contains(where: { axName.localizedCaseInsensitiveContains($0) }) {
             LayoutItemInfo.recordTitle(axName, for: windowID)
             return axName
         }
@@ -89,6 +91,118 @@ struct LayoutItemInfo: Identifiable, Hashable {
             return "Control Center"
         }
 
+        // Control Center modules typically have bundle IDs like com.apple.controlcenter.wifi
+        // Try to identify specific modules
+        if let bundleID = bundleIdentifier {
+            let bundleIDLower = bundleID.lowercased()
+            
+            // First check if this is a Control Center module
+            if bundleIDLower.contains("controlcenter") || bundleIDLower.contains("control-center") || bundleIDLower.contains("bento") || ownerName == "ControlCenter" {
+                if bundleIDLower.contains("wifi") || bundleIDLower.contains("network") || bundleIDLower.contains("airport") {
+                    return "Wi-Fi"
+                } else if bundleIDLower.contains("bluetooth") || bundleIDLower.contains("bt") {
+                    return "Bluetooth"
+                } else if bundleIDLower.contains("sound") || bundleIDLower.contains("audio") || bundleIDLower.contains("speaker") {
+                    return "Sound"
+                } else if bundleIDLower.contains("display") || bundleIDLower.contains("brightness") || bundleIDLower.contains("monitor") || bundleIDLower.contains("airdrop") {
+                    return "Display & Brightness"
+                } else if bundleIDLower.contains("battery") || bundleIDLower.contains("power") {
+                    return "Battery"
+                } else if bundleIDLower.contains("focus") || bundleIDLower.contains("dnd") || bundleIDLower.contains("do-not-disturb") || bundleIDLower.contains("donotdisturb") {
+                    return "Focus"
+                } else if bundleIDLower.contains("airplane") || bundleIDLower.contains("airplanemode") {
+                    return "AirPlane Mode"
+                } else if bundleIDLower.contains("screen") && bundleIDLower.contains("mirror") {
+                    return "Screen Mirror"
+                } else if bundleIDLower.contains("screen") && (bundleIDLower.contains("time") || bundleIDLower.contains("limits")) {
+                    return "Screen Time"
+                } else if bundleIDLower.contains("airplay") || bundleIDLower.contains("airplayvisual") {
+                    return "AirPlay"
+                } else if bundleIDLower.contains("home") {
+                    return "Home"
+                } else if bundleIDLower.contains("nowplaying") || bundleIDLower.contains("now-playing") || bundleIDLower.contains("media") || bundleIDLower.contains("music") {
+                    return "Now Playing"
+                } else if bundleIDLower.contains("siri") || bundleIDLower.contains("voice") {
+                    return "Siri"
+                } else if bundleIDLower.contains("clock") || bundleIDLower.contains("time") || bundleIDLower.contains("date") || bundleIDLower.contains("timer") {
+                    return "Clock"
+                } else if bundleIDLower.contains("keyboard") || bundleIDLower.contains("textinput") || bundleIDLower.contains("dictation") || bundleIDLower.contains("input") {
+                    return "Keyboard"
+                } else if bundleIDLower.contains("trackpad") || bundleIDLower.contains("mouse") || bundleIDLower.contains("mouse") {
+                    return "Trackpad/Mouse"
+                } else if bundleIDLower.contains("character") || bundleIDLower.contains("emoji") {
+                    return "Character Viewer"
+                } else if bundleIDLower.contains("shortcuts") || bundleIDLower.contains("script") {
+                    return "Shortcuts"
+                } else if bundleIDLower.contains("accessibility") || bundleIDLower.contains("a11y") {
+                    return "Accessibility"
+                } else if bundleIDLower.contains("calendar") {
+                    return "Calendar"
+                } else if bundleIDLower.contains("spotlight") || bundleIDLower.contains("search") {
+                    return "Spotlight"
+                } else if bundleIDLower.contains("timemachine") || bundleIDLower.contains("time-machine") {
+                    return "Time Machine"
+                } else {
+                    return "Control Center"
+                }
+            }
+
+            // Non-Control Center apps
+            if bundleIDLower.contains("wifi") {
+                return "Wi-Fi"
+            } else if bundleIDLower.contains("bluetooth") {
+                return "Bluetooth"
+            } else if bundleIDLower.contains("sound") || bundleIDLower.contains("audio") {
+                return "Sound"
+            } else if bundleIDLower.contains("display") || bundleIDLower.contains("brightness") {
+                return "Display"
+            } else if bundleIDLower.contains("battery") || bundleIDLower.contains("power") {
+                return "Battery"
+            } else if bundleIDLower.contains("airdrop") {
+                return "AirDrop"
+            } else if bundleIDLower.contains("focus") || bundleIDLower.contains("dnd") || bundleIDLower.contains("do-not-disturb") {
+                return "Focus"
+            } else if bundleIDLower.contains("network") {
+                return "Network"
+            } else if bundleIDLower.contains("airport") {
+                return "Wi-Fi"
+            } else if bundleIDLower.contains("clock") || bundleIDLower.contains("time") {
+                return "Clock"
+            } else if bundleIDLower.contains("nowplaying") || bundleIDLower.contains("now-playing") || bundleIDLower.contains("media") {
+                return "Now Playing"
+            } else if bundleIDLower.contains("screen") && bundleIDLower.contains("mirror") {
+                return "Screen Mirror"
+            } else if bundleIDLower.contains("screen") {
+                return "Screen Time"
+            } else if bundleIDLower.contains("airplay") || bundleIDLower.contains("airplayvisual") {
+                return "AirPlay"
+            } else if bundleIDLower.contains("home") {
+                return "Home"
+            } else if bundleIDLower.contains("calendar") {
+                return "Calendar"
+            } else if bundleIDLower.contains("shortcuts") || bundleIDLower.contains("script") {
+                return "Shortcuts"
+            } else if bundleIDLower.contains("accessibility") {
+                return "Accessibility"
+            } else if bundleIDLower.contains("keyboard") {
+                return "Keyboard"
+            } else if bundleIDLower.contains("trackpad") || bundleIDLower.contains("mouse") {
+                return "Trackpad/Mouse"
+            } else if bundleIDLower.contains("dictation") {
+                return "Dictation"
+            } else if bundleIDLower.contains("siri") {
+                return "Siri"
+            } else if bundleIDLower.contains("emoji") || bundleIDLower.contains("character") {
+                return "Character Viewer"
+            } else if bundleIDLower.contains("controlcenter") || bundleIDLower.contains("control-center") || bundleIDLower.contains("bento") {
+                return "Control Center"
+            } else if bundleIDLower.contains("spotlight") {
+                return "Spotlight"
+            } else if bundleIDLower.contains("time-machine") || bundleIDLower.contains("timemachine") {
+                return "Time Machine"
+            }
+        }
+
         return "Item #\(windowID % 1000)"
     }
 
@@ -96,7 +210,13 @@ struct LayoutItemInfo: Identifiable, Hashable {
     private static let titleCacheLock = NSLock()
 
     static func recordTitle(_ title: String, for windowID: CGWindowID) {
-        guard !title.isEmpty, !title.hasPrefix("Item-"), !title.hasPrefix("BentoBox"), title != "Control Center" else { return }
+        let genericTitles: Set<String> = [
+            "Item-0", "Item-1", "Item-2", "Item-3", "Item-4", "Item-5", "Item-6", "Item-7", "Item-8", "Item-9",
+            "BentoBox-0", "BentoBox", "Window Server", "Main Status Menu", "StatusItem",
+            "AXMenuBar", "AXMenu", "AXPopup", "AXButton", "AXGroup", "AXApplication",
+            "AXScrollArea", "AXMainGroup"
+        ]
+        guard !title.isEmpty, !title.hasPrefix("Item-"), !title.hasPrefix("BentoBox"), title != "Control Center", !genericTitles.contains(title) else { return }
         titleCacheLock.lock()
         titleCache[windowID] = title
         titleCacheLock.unlock()
@@ -111,7 +231,9 @@ struct LayoutItemInfo: Identifiable, Hashable {
     private static func queryAccessibilityName(for frame: CGRect, windowID: CGWindowID) -> String? {
         let genericTitles: Set<String> = [
             "Item-0", "Item-1", "Item-2", "Item-3", "Item-4", "Item-5", "Item-6", "Item-7", "Item-8", "Item-9",
-            "BentoBox-0", "BentoBox", "Window Server", "Main Status Menu", "StatusItem", "Control Center", "ControlCenter"
+            "BentoBox-0", "BentoBox", "Window Server", "Main Status Menu", "StatusItem", "Control Center", "ControlCenter",
+            "AXMenuBar", "AXMenu", "AXPopup", "AXButton", "AXGroup", "AXApplication",
+            "AXScrollArea", "AXMainGroup"
         ]
 
         // Check ALL points in the frame at multiple rows/columns
