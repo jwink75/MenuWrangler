@@ -12,15 +12,37 @@ struct FolderLayoutBar: View {
     @State private var items: [LayoutItemInfo] = []
     @State private var isRefreshing = false
     @State private var lastRefreshTime: Date = .distantPast
+    @State private var isEditingName = false
+    @State private var editedName = ""
+    @FocusState private var isNameFieldFocused: Bool
 
     private let minimumRefreshInterval: TimeInterval = 0.3
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text(folderName)
-                    .font(.system(size: 14, weight: .medium))
-                    .padding(.leading, 2)
+                if isEditingName {
+                    TextField("Folder name", text: $editedName, onCommit: {
+                        saveFolderName()
+                    })
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 150)
+                    .focused($isNameFieldFocused)
+                    .onAppear {
+                        isNameFieldFocused = true
+                    }
+                } else {
+                    Text(folderName)
+                        .font(.system(size: 14, weight: .medium))
+                        .onTapGesture(count: 2) {
+                            startEditingName()
+                        }
+                        .contextMenu {
+                            Button("Rename") {
+                                startEditingName()
+                            }
+                        }
+                }
 
                 Spacer()
 
@@ -113,6 +135,29 @@ struct FolderLayoutBar: View {
         }
 
         return true
+    }
+    
+    private func startEditingName() {
+        editedName = folderName
+        isEditingName = true
+    }
+    
+    private func saveFolderName() {
+        let trimmedName = editedName.trimmingCharacters(in: .whitespaces)
+        if !trimmedName.isEmpty && trimmedName != folderName {
+            // Rename: update all items' assignments
+            let itemsToMove = folderManager.folderAssignments.filter { $0.value == folderName }
+            folderManager.deleteFolder(named: folderName)
+            for (windowID, _) in itemsToMove {
+                folderManager.folderAssignments[windowID] = trimmedName
+            }
+            folderManager.folderNames.insert(trimmedName)
+            folderManager.saveToUserDefaults()
+        } else if trimmedName == folderName {
+            // No change
+        }
+        isEditingName = false
+        isNameFieldFocused = false
     }
 }
 

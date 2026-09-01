@@ -68,7 +68,7 @@ final class LayoutFolderManager: ObservableObject {
         }
     }
 
-    private func saveToUserDefaults() {
+    func saveToUserDefaults() {
         var stringDict: [String: String] = [:]
         for (windowID, folder) in folderAssignments {
             stringDict[String(windowID)] = folder
@@ -76,6 +76,7 @@ final class LayoutFolderManager: ObservableObject {
         if let data = try? JSONEncoder().encode(stringDict) {
             UserDefaults.standard.set(data, forKey: userDefaultsKey)
         }
+        objectWillChange.send()
     }
 
     private func saveFolderNames() {

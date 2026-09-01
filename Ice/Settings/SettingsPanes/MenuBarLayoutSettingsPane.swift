@@ -8,7 +8,6 @@ import SwiftUI
 struct MenuBarLayoutSettingsPane: View {
     @EnvironmentObject var appState: AppState
     @ObservedObject var folderManager = LayoutFolderManager.shared
-    @State private var showNewFolderDialog = false
     @State private var newFolderName = ""
     @AppStorage("MenuBarLayout_showItemLabels") private var showLabels: Bool = true
 
@@ -27,29 +26,6 @@ struct MenuBarLayoutSettingsPane: View {
                 }
                 folderManagement
                 layoutBars
-            }
-            .sheet(isPresented: $showNewFolderDialog) {
-                VStack(spacing: 16) {
-                    Text("New Folder")
-                        .font(.headline)
-                    TextField("Folder name", text: $newFolderName)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 250)
-                    HStack {
-                        Button("Cancel") {
-                            showNewFolderDialog = false
-                            newFolderName = ""
-                        }
-                        Button("Create") {
-                            folderManager.createFolder(named: newFolderName)
-                            showNewFolderDialog = false
-                            newFolderName = ""
-                        }
-                        .disabled(newFolderName.isEmpty)
-                    }
-                }
-                .padding()
-                .frame(minWidth: 300, minHeight: 150)
             }
         }
     }
@@ -121,7 +97,7 @@ struct MenuBarLayoutSettingsPane: View {
                 Spacer()
 
                 Button(action: {
-                    showNewFolderDialog = true
+                    folderManager.createFolder(named: "New Folder")
                 }) {
                     Label("New Folder", systemImage: "folder.badge.plus")
                 }
@@ -130,7 +106,7 @@ struct MenuBarLayoutSettingsPane: View {
             }
 
             if folderManager.folderNames.isEmpty {
-                Text("Create folders to group related items together.")
+                Text("Create folders to group related items together. Drag items from Visible/Hidden sections into folders.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.leading, 2)
