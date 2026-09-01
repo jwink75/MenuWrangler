@@ -158,5 +158,6 @@ struct FolderLayoutBar: View {
         }
         isEditingName = false
         isNameFieldFocused = false
+        NotificationCenter.default.post(name: NSNotification.Name("MenuBarsNeedRefresh"), object: nil)
     }
 }

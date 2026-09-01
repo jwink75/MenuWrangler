@@ -33,6 +33,7 @@ final class LayoutFolderManager: ObservableObject {
     }
 
     func assign(_ item: LayoutItemInfo, to folder: String?) {
+        objectWillChange.send()
         if let folder = folder {
             folderAssignments[item.windowID] = folder
             folderNames.insert(folder)
@@ -43,10 +44,13 @@ final class LayoutFolderManager: ObservableObject {
     }
 
     func createFolder(named name: String) {
+        objectWillChange.send()
         folderNames.insert(name)
+        saveFolderNames()
     }
 
     func deleteFolder(named name: String) {
+        objectWillChange.send()
         folderNames.remove(name)
         folderAssignments = folderAssignments.filter { $0.value != name }
         saveToUserDefaults()
@@ -76,7 +80,6 @@ final class LayoutFolderManager: ObservableObject {
         if let data = try? JSONEncoder().encode(stringDict) {
             UserDefaults.standard.set(data, forKey: userDefaultsKey)
         }
-        objectWillChange.send()
     }
 
     private func saveFolderNames() {

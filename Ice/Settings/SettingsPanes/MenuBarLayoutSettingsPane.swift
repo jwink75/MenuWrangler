@@ -129,7 +129,7 @@ struct MenuBarLayoutSettingsPane: View {
     @ViewBuilder
     private var layoutBars: some View {
         VStack(spacing: 25) {
-            ForEach(MenuBarSection.Name.allCases, id: \.self) { section in
+            ForEach(MenuBarSection.Name.predefinedCases, id: \.self) { section in
                 layoutBar(for: section)
             }
             
