@@ -35,6 +35,8 @@ struct LayoutItemInfo: Identifiable, Hashable {
         let titleLower = title.lowercased()
         if titleLower.contains("wifi") || titleLower.contains("wi-fi") {
             return "Wi-Fi"
+        } else if titleLower.contains("bento") || titleLower.contains("controlcenter") || titleLower.contains("control center") || titleLower.contains("axmenubar") {
+            // These are Control Center items, continue to bundle ID resolution
         } else if titleLower.contains("battery") || titleLower.contains("power") {
             return "Battery"
         } else if titleLower.contains("bluetooth") {
@@ -51,6 +53,34 @@ struct LayoutItemInfo: Identifiable, Hashable {
             return "Now Playing"
         } else if titleLower.contains("airdrop") {
             return "AirDrop"
+        } else {
+            // Check if the title itself is a recognizable app name
+            if !title.isEmpty && !title.hasPrefix("Item-") && !title.hasPrefix("BentoBox-") {
+                // Check if it looks like a real app name (capitalized, no generic terms)
+                if titleLower.contains("dropbox") {
+                    return "Dropbox"
+                } else if titleLower.contains("onedrive") {
+                    return "OneDrive"
+                } else if titleLower.contains("googledrive") || titleLower.contains("google drive") {
+                    return "Google Drive"
+                } else if titleLower.contains("streamdeck") || titleLower.contains("stream deck") {
+                    return "Stream Deck"
+                } else if titleLower.contains("slack") {
+                    return "Slack"
+                } else if titleLower.contains("discord") {
+                    return "Discord"
+                } else if titleLower.contains("zoom") {
+                    return "Zoom"
+                } else if titleLower.contains("spotify") {
+                    return "Spotify"
+                } else if titleLower.contains("notion") {
+                    return "Notion"
+                } else if titleLower.contains("alfred") {
+                    return "Alfred"
+                } else if titleLower.contains("raycast") {
+                    return "Raycast"
+                }
+            }
         }
 
         // 3. Check persistent title cache
@@ -67,9 +97,100 @@ struct LayoutItemInfo: Identifiable, Hashable {
 
         // 5. Check MenuBarItem displayName from legacy introspection
         if let legacyDisplayName = MenuBarItem(windowID: windowID)?.displayName,
-           legacyDisplayName != "Unknown" && legacyDisplayName != "ControlCenter" && legacyDisplayName != "Control Center" && !genericTitles.contains(legacyDisplayName) {
+           !legacyDisplayName.isEmpty && !legacyDisplayName.hasPrefix("Item-") && !genericTitles.contains(legacyDisplayName) && legacyDisplayName != "ControlCenter" && legacyDisplayName != "Control Center" && legacyDisplayName != "BentoBox" && !legacyDisplayName.hasPrefix("BentoBox-") && !legacyDisplayName.hasPrefix("AX") {
             LayoutItemInfo.recordTitle(legacyDisplayName, for: windowID)
             return legacyDisplayName
+        }
+
+        // 5b. Try to resolve from bundle identifier for known third-party apps
+        if let bundleID = bundleIdentifier, let app = NSRunningApplication(processIdentifier: ownerPID) {
+            let bundleIDLower = bundleID.lowercased()
+            let localizedName = app.localizedName ?? ""
+            
+            // Only use bundle ID mapping for non-Control Center apps
+            let isControlCenterApp = bundleIDLower == "com.apple.controlcenter" && localizedName == "ControlCenter"
+            
+            if !isControlCenterApp {
+                if bundleIDLower.contains("dropbox") {
+                    LayoutItemInfo.recordTitle("Dropbox", for: windowID)
+                    return "Dropbox"
+                } else if bundleIDLower.contains("microsoft") && bundleIDLower.contains("onenote") {
+                    LayoutItemInfo.recordTitle("OneNote", for: windowID)
+                    return "OneNote"
+                } else if bundleIDLower.contains("microsoft") && bundleIDLower.contains("teams") {
+                    LayoutItemInfo.recordTitle("Microsoft Teams", for: windowID)
+                    return "Microsoft Teams"
+                } else if bundleIDLower.contains("microsoft") && bundleIDLower.contains("word") {
+                    LayoutItemInfo.recordTitle("Word", for: windowID)
+                    return "Word"
+                } else if bundleIDLower.contains("microsoft") && bundleIDLower.contains("excel") {
+                    LayoutItemInfo.recordTitle("Excel", for: windowID)
+                    return "Excel"
+                } else if bundleIDLower.contains("microsoft") && bundleIDLower.contains("powerpoint") {
+                    LayoutItemInfo.recordTitle("PowerPoint", for: windowID)
+                    return "PowerPoint"
+                } else if bundleIDLower.contains("google") || bundleIDLower.contains("chrome") || bundleIDLower.contains("googledrive") {
+                    LayoutItemInfo.recordTitle("Google Drive", for: windowID)
+                    return "Google Drive"
+                } else if bundleIDLower.contains("onedrive") || (bundleIDLower.contains("microsoft") && bundleIDLower.contains("drive")) {
+                    LayoutItemInfo.recordTitle("OneDrive", for: windowID)
+                    return "OneDrive"
+                } else if bundleIDLower.contains("elgato") || bundleIDLower.contains("streamdeck") || bundleIDLower.contains("stream-deck") {
+                    LayoutItemInfo.recordTitle("Stream Deck", for: windowID)
+                    return "Stream Deck"
+                } else if bundleIDLower.contains("slack") {
+                    LayoutItemInfo.recordTitle("Slack", for: windowID)
+                    return "Slack"
+                } else if bundleIDLower.contains("discord") {
+                    LayoutItemInfo.recordTitle("Discord", for: windowID)
+                    return "Discord"
+                } else if bundleIDLower.contains("zoom") {
+                    LayoutItemInfo.recordTitle("Zoom", for: windowID)
+                    return "Zoom"
+                } else if bundleIDLower.contains("spotify") {
+                    LayoutItemInfo.recordTitle("Spotify", for: windowID)
+                    return "Spotify"
+                } else if bundleIDLower.contains("1password") || bundleIDLower.contains("lastpass") || bundleIDLower.contains("bitwarden") {
+                    LayoutItemInfo.recordTitle("Passwords", for: windowID)
+                    return "Passwords"
+                } else if bundleIDLower.contains("notion") {
+                    LayoutItemInfo.recordTitle("Notion", for: windowID)
+                    return "Notion"
+                } else if bundleIDLower.contains("figma") {
+                    LayoutItemInfo.recordTitle("Figma", for: windowID)
+                    return "Figma"
+                } else if bundleIDLower.contains("adobe") && bundleIDLower.contains("creative") {
+                    LayoutItemInfo.recordTitle("Adobe", for: windowID)
+                    return "Adobe"
+                } else if bundleIDLower.contains("alfred") {
+                    LayoutItemInfo.recordTitle("Alfred", for: windowID)
+                    return "Alfred"
+                } else if bundleIDLower.contains("raycast") {
+                    LayoutItemInfo.recordTitle("Raycast", for: windowID)
+                    return "Raycast"
+                } else if bundleIDLower.contains("bartender") {
+                    LayoutItemInfo.recordTitle("Bartender", for: windowID)
+                    return "Bartender"
+                } else if bundleIDLower.contains("cleanmy") || bundleIDLower.contains("macpaw") {
+                    LayoutItemInfo.recordTitle("CleanMyMac", for: windowID)
+                    return "CleanMyMac"
+                } else if bundleIDLower.contains("adobe") {
+                    LayoutItemInfo.recordTitle(app.localizedName ?? "Adobe", for: windowID)
+                    return app.localizedName ?? "Adobe"
+                } else if bundleIDLower.contains("microsoft") {
+                    LayoutItemInfo.recordTitle(localizedName, for: windowID)
+                    return localizedName
+                } else if bundleIDLower.contains("google") {
+                    LayoutItemInfo.recordTitle("Google", for: windowID)
+                    return "Google"
+                } else {
+                    // Use the app's localized name as a fallback for any other third-party app
+                    if !localizedName.isEmpty && localizedName != "Unknown" && localizedName != "ControlCenter" && localizedName != "Control Center" {
+                        LayoutItemInfo.recordTitle(localizedName, for: windowID)
+                        return localizedName
+                    }
+                }
+            }
         }
 
         // 6. Resolve via NSRunningApplication localizedName
