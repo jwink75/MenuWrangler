@@ -27,12 +27,17 @@ struct MenuBarLayoutSettingsPane: View {
         HStack {
             Text("Drag to arrange your menu bar items")
                 .font(.title2)
+
             Spacer()
-            Button("Refresh") {
+
+            Button(action: {
                 WindowQuery.clearIconCache()
                 NotificationCenter.default.post(name: NSApplication.didBecomeActiveNotification, object: nil)
+            }) {
+                Label("Refresh", systemImage: "arrow.clockwise")
             }
             .buttonStyle(.borderless)
+            .controlSize(.small)
         }
 
         IceGroupBox {

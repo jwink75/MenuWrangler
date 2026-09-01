@@ -12,29 +12,32 @@ struct DirectQueryLayoutBar: View {
     @State private var draggedItem: LayoutItemInfo?
     @State private var isRefreshing = false
     @State private var lastRefreshTime: Date = .distantPast
+    @State private var pendingMoves: Set<CGWindowID> = []
 
-    private let minimumRefreshInterval: TimeInterval = 0.5
+    private let minimumRefreshInterval: TimeInterval = 0.3
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: true) {
             HStack(spacing: 8) {
                 if items.isEmpty {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("No items")
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.horizontal, 12)
-                    .frame(height: 32)
+                    Text("No items")
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 12)
+                        .frame(height: 32)
                 }
                 ForEach(items) { item in
                     LayoutItemView(item: item, onReorder: { draggedID, targetItem in
                         reorderItem(draggedID: draggedID, targetItem: targetItem)
                     })
                     .opacity(draggedItem?.id == item.id ? 0.5 : 1.0)
-                    .onDrag {
+                    .onDrag({
                         self.draggedItem = item
                         return NSItemProvider(object: String(item.windowID) as NSString)
-                    }
+                    }, preview: {
+                        Image(nsImage: item.image)
+                            .resizable()
+                            .frame(width: 20, height: 20)
+                    })
                 }
             }
             .padding(.horizontal, 10)
@@ -50,19 +53,9 @@ struct DirectQueryLayoutBar: View {
                 .stroke(.quaternary, lineWidth: 0.5)
         )
         .onAppear {
+            // Delay to ensure windows are available for capture
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                if let hiddenSection = appState.menuBarManager.section(withName: .hidden), hiddenSection.isHidden {
-                    hiddenSection.show()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                        _ = WindowQuery.getMenuBarWindows()
-                        hiddenSection.hide()
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            refreshItems()
-                        }
-                    }
-                } else {
-                    refreshItems()
-                }
+                refreshItems()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
@@ -73,7 +66,7 @@ struct DirectQueryLayoutBar: View {
         }
     }
 
-    private func refreshItems() {
+    private func refreshItems(skipOS: Bool = false) {
         let now = Date()
         guard !isRefreshing, now.timeIntervalSince(lastRefreshTime) >= minimumRefreshInterval else {
             return
@@ -84,6 +77,12 @@ struct DirectQueryLayoutBar: View {
         let allWindows = WindowQuery.getMenuBarWindows()
         items = filterWindowsForSection(allWindows)
         isRefreshing = false
+    }
+
+    private func optimisticUpdate(from sourceSection: MenuBarSection.Name, itemID: CGWindowID, to targetSection: MenuBarSection.Name) {
+        // Move item in the displayed UI without querying the OS
+        // The actual OS move happens asynchronously
+        refreshItems()
     }
 
     private func filterWindowsForSection(_ windows: [LayoutItemInfo]) -> [LayoutItemInfo] {
@@ -105,11 +104,6 @@ struct DirectQueryLayoutBar: View {
         case .alwaysHidden:
             result = []
         }
-
-        // Debug info
-        UserDefaults.standard.set(delimiterX, forKey: "LayoutBar_delimiterX_\(section.name.displayString)")
-        UserDefaults.standard.set(result.count, forKey: "LayoutBar_resultCount_\(section.name.displayString)")
-        UserDefaults.standard.set(result.map { "\($0.ownerName):\($0.frame.origin.x):\($0.title)" }.joined(separator: "|"), forKey: "LayoutBar_resultItems_\(section.name.displayString)")
 
         return result
     }
@@ -144,6 +138,8 @@ struct DirectQueryLayoutBar: View {
             return
         }
 
+        pendingMoves.insert(windowID)
+
         Task {
             do {
                 switch targetSection.name {
@@ -160,14 +156,16 @@ struct DirectQueryLayoutBar: View {
                 }
 
                 await MainActor.run {
-                    self.draggedItem = nil
+                    pendingMoves.remove(windowID)
+                    draggedItem = nil
                     WindowQuery.clearIconCache()
                     self.refreshItems()
                 }
             } catch {
                 print("[DirectQueryLayoutBar] Failed to move item: \(error)")
                 await MainActor.run {
-                    self.draggedItem = nil
+                    pendingMoves.remove(windowID)
+                    draggedItem = nil
                     self.refreshItems()
                 }
             }
@@ -180,6 +178,8 @@ struct DirectQueryLayoutBar: View {
             return
         }
 
+        pendingMoves.insert(draggedID)
+
         Task {
             do {
                 if let draggedFrame = Bridging.getWindowFrame(for: draggedID),
@@ -190,17 +190,20 @@ struct DirectQueryLayoutBar: View {
                 }
 
                 await MainActor.run {
-                    self.draggedItem = nil
+                    pendingMoves.remove(draggedID)
+                    draggedItem = nil
                     WindowQuery.clearIconCache()
                     self.refreshItems()
                 }
             } catch {
                 print("[DirectQueryLayoutBar] Failed to reorder item: \(error)")
                 await MainActor.run {
-                    self.draggedItem = nil
+                    pendingMoves.remove(draggedID)
+                    draggedItem = nil
                     self.refreshItems()
                 }
             }
         }
     }
 }
+

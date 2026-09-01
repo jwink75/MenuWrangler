@@ -114,25 +114,36 @@ struct LayoutItemInfo: Identifiable, Hashable {
             "BentoBox-0", "BentoBox", "Window Server", "Main Status Menu", "StatusItem", "Control Center", "ControlCenter"
         ]
 
-        // 1. Direct point query for on-screen items
-        let point = CGPoint(x: frame.midX, y: frame.midY)
-        if point.x > 0 {
-            var element: AXUIElement?
-            if AXUIElementCopyElementAtPosition(AXUIElementCreateSystemWide(), Float(point.x), Float(point.y), &element) == .success,
-               let element {
-                var value: CFTypeRef?
-                if AXUIElementCopyAttributeValue(element, kAXDescriptionAttribute as CFString, &value) == .success,
-                   let desc = value as? String, !desc.isEmpty && !genericTitles.contains(desc) {
-                    return desc
-                }
-                if AXUIElementCopyAttributeValue(element, kAXTitleAttribute as CFString, &value) == .success,
-                   let title = value as? String, !title.isEmpty && !genericTitles.contains(title) {
-                    return title
+        // Check ALL points in the frame at multiple rows/columns
+        let menuBarHeight = NSStatusBar.system.thickness
+        let rows = max(1, Int(frame.height / 4))
+        let cols = max(1, min(10, Int(frame.width / max(4, frame.width / 20))))
+
+        for row in 0..<rows {
+            for col in 0..<cols {
+                let point = CGPoint(
+                    x: frame.origin.x + CGFloat(col) * (frame.width / CGFloat(cols)),
+                    y: frame.origin.y + CGFloat(row) * (frame.height / CGFloat(rows)) + menuBarHeight
+                )
+
+                if point.x > 0 && point.y > 0 {
+                    var element: AXUIElement?
+                    if AXUIElementCopyElementAtPosition(AXUIElementCreateSystemWide(), Float(point.x), Float(point.y), &element) == .success,
+                       let element {
+                        // Try multiple attributes
+                        for attr: String in [kAXDescriptionAttribute, kAXTitleAttribute, kAXValueAttribute, kAXRoleAttribute] {
+                            var value: CFTypeRef?
+                            if AXUIElementCopyAttributeValue(element, attr as CFString, &value) == .success,
+                               let str = value as? String, !str.isEmpty && !genericTitles.contains(str) {
+                                return str
+                            }
+                        }
+                    }
                 }
             }
         }
 
-        // 2. Query Control Center AX application hierarchy by matching position
+        // Query Control Center AX application hierarchy
         guard let controlCenter = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.controlcenter").first else {
             return nil
         }
@@ -143,34 +154,42 @@ struct LayoutItemInfo: Identifiable, Hashable {
             return nil
         }
 
-        for child in children {
-            var subChildrenRef: CFTypeRef?
-            if AXUIElementCopyAttributeValue(child, kAXChildrenAttribute as CFString, &subChildrenRef) == .success,
-               let subChildren = subChildrenRef as? [AXUIElement] {
-                for item in subChildren {
+        // Recursive search through children
+        func searchChildren(_ elements: [AXUIElement], depth: Int) -> String? {
+            guard depth < 5 else { return nil }
+            for child in elements {
+                var subChildrenRef: CFTypeRef?
+                if AXUIElementCopyAttributeValue(child, kAXChildrenAttribute as CFString, &subChildrenRef) == .success,
+                   let subChildren = subChildrenRef as? [AXUIElement], !subChildren.isEmpty {
+
+                    // Check this element's position
                     var posRef: CFTypeRef?
-                    if AXUIElementCopyAttributeValue(item, kAXPositionAttribute as CFString, &posRef) == .success,
+                    if AXUIElementCopyAttributeValue(child, kAXPositionAttribute as CFString, &posRef) == .success,
                        let posRef {
                         var axPoint = CGPoint.zero
                         if AXValueGetValue(posRef as! AXValue, .cgPoint, &axPoint) {
-                            if abs(axPoint.x - frame.origin.x) < 10 {
-                                var descRef: CFTypeRef?
-                                if AXUIElementCopyAttributeValue(item, kAXDescriptionAttribute as CFString, &descRef) == .success,
-                                   let desc = descRef as? String, !desc.isEmpty && !genericTitles.contains(desc) {
-                                    return desc
-                                }
-                                if AXUIElementCopyAttributeValue(item, kAXTitleAttribute as CFString, &descRef) == .success,
-                                   let title = descRef as? String, !title.isEmpty && !genericTitles.contains(title) {
-                                    return title
+                            if abs(axPoint.x - frame.midX) < 20 {
+                                for attr: String in [kAXDescriptionAttribute, kAXTitleAttribute] {
+                                    var descRef: CFTypeRef?
+                                    if AXUIElementCopyAttributeValue(child, attr as CFString, &descRef) == .success,
+                                       let desc = descRef as? String, !desc.isEmpty && !genericTitles.contains(desc) {
+                                        return desc
+                                    }
                                 }
                             }
                         }
                     }
+
+                    // Recurse into children
+                    if let found = searchChildren(subChildren, depth: depth + 1) {
+                        return found
+                    }
                 }
             }
+            return nil
         }
 
-        return nil
+        return searchChildren(children, depth: 0)
     }
 
     func hash(into hasher: inout Hasher) {
