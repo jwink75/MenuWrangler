@@ -99,7 +99,8 @@ struct DirectQueryLayoutBar: View {
 
         // Exclude items that are in folders
         let folderManager = LayoutFolderManager.shared
-        let nonFolderedWindows = sortedWindows.filter { !folderManager.folderAssignments.keys.contains($0.windowID) }
+        let itemsInFolders = Set(folderManager.folders.flatMap { $0.itemWindowIDs })
+        let nonFolderedWindows = sortedWindows.filter { !itemsInFolders.contains($0.windowID) }
 
         let result: [LayoutItemInfo]
         switch section.name {
@@ -142,7 +143,9 @@ struct DirectQueryLayoutBar: View {
 
         // Handle folder targets - just update assignment, no OS calls
         if case .folder(let folderName) = targetSection.name {
-            folderManager.assign(LayoutItemInfo.dummy(windowID: windowID), to: folderName)
+            if let folderIndex = folderManager.folders.firstIndex(where: { $0.name == folderName }) {
+                folderManager.assignItem(windowID: windowID, toFolderAt: folderIndex)
+            }
             draggedItem = nil
             NotificationCenter.default.post(name: NSNotification.Name("MenuBarsNeedRefresh"), object: nil)
             refreshItems()
@@ -155,8 +158,8 @@ struct DirectQueryLayoutBar: View {
         }
 
         // Handle moving from a folder back to a regular section
-        if folderManager.folderAssignments.keys.contains(windowID) {
-            folderManager.assign(LayoutItemInfo.dummy(windowID: windowID), to: nil)
+        if folderManager.folders.contains(where: { $0.itemWindowIDs.contains(windowID) }) {
+            folderManager.assignItem(windowID: windowID, toFolderAt: nil)
         }
 
         guard let hiddenSection = appState.menuBarManager.section(withName: .hidden),

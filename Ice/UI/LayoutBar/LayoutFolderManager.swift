@@ -7,82 +7,138 @@ import Foundation
 import Cocoa
 import Combine
 
+struct FolderInfo: Identifiable, Hashable {
+    let id = UUID()
+    var name: String
+    var iconName: String
+    var itemWindowIDs: Set<CGWindowID>
+    
+    init(name: String = "", iconName: String = "folder", itemWindowIDs: Set<CGWindowID> = []) {
+        self.name = name
+        self.iconName = iconName
+        self.itemWindowIDs = itemWindowIDs
+    }
+}
+
 final class LayoutFolderManager: ObservableObject {
     static let shared = LayoutFolderManager()
-
-    @Published var folderAssignments: [CGWindowID: String] = [:]
-    @Published var folderNames: Set<String> = []
-
-    private let userDefaultsKey = "MenuBarLayout_folderAssignments"
-    private let folderNamesKey = "MenuBarLayout_folderNames"
-
-    private var cancellables = Set<AnyCancellable>()
+    
+    @Published var folders: [FolderInfo] = []
+    
+    private let userDefaultsKey = "MenuBarLayout_folders_v2"
 
     init() {
         loadFromUserDefaults()
-
-        $folderNames
-            .sink { [weak self] names in
-                self?.saveFolderNames()
-            }
-            .store(in: &cancellables)
+        
+        // Default: just the hidden folder
+        let hiddenSection = UserDefaults.standard.dictionary(forKey: "MenuBarLayout_hiddenSection") as? [String: Any]
+        
+        if folders.isEmpty {
+            // Create default folders if none exist
+            folders = [
+                FolderInfo(name: "Hidden", iconName: "chevron.left.2", itemWindowIDs: [])
+            ]
+            saveToUserDefaults()
+        }
     }
-
-    func items(in folder: String, from allItems: [LayoutItemInfo]) -> [LayoutItemInfo] {
-        allItems.filter { folderAssignments[$0.windowID] == folder }
-    }
-
-    func assign(_ item: LayoutItemInfo, to folder: String?) {
+    
+    func addFolder(named name: String = "Folder", iconName: String = "folder") {
         objectWillChange.send()
-        if let folder = folder {
-            folderAssignments[item.windowID] = folder
-            folderNames.insert(folder)
+        folders.append(FolderInfo(name: name, iconName: iconName, itemWindowIDs: []))
+        saveToUserDefaults()
+    }
+    
+    func deleteFolder(at index: Int) {
+        guard index < folders.count else { return }
+        objectWillChange.send()
+        if index == 0 {
+            let deletedFolder = folders.remove(at: 0)
+            if folders.indices.contains(0) {
+                folders[0].itemWindowIDs.formUnion(deletedFolder.itemWindowIDs)
+            }
         } else {
-            folderAssignments.removeValue(forKey: item.windowID)
-        }
-        saveToUserDefaults()
-    }
-
-    func createFolder(named name: String) {
-        objectWillChange.send()
-        folderNames.insert(name)
-        saveFolderNames()
-    }
-
-    func deleteFolder(named name: String) {
-        objectWillChange.send()
-        folderNames.remove(name)
-        folderAssignments = folderAssignments.filter { $0.value != name }
-        saveToUserDefaults()
-    }
-
-    private func loadFromUserDefaults() {
-        if let data = UserDefaults.standard.data(forKey: userDefaultsKey),
-           let decoded = try? JSONDecoder().decode([String: String].self, from: data) {
-            var result: [CGWindowID: String] = [:]
-            for (key, value) in decoded {
-                if let windowID = CGWindowID(key) {
-                    result[windowID] = value
-                }
+            let deletedFolder = folders.remove(at: index)
+            // Items in deleted folder - redistribute to previous folder
+            let prevIndex = index - 1
+            if folders.indices.contains(prevIndex) {
+                folders[prevIndex].itemWindowIDs.formUnion(deletedFolder.itemWindowIDs)
             }
-            folderAssignments = result
         }
-        if let names = UserDefaults.standard.stringArray(forKey: folderNamesKey) {
-            folderNames = Set(names)
+        saveToUserDefaults()
+    }
+    
+    func renameFolder(at index: Int, to newName: String) {
+        guard index < folders.count, !newName.isEmpty else { return }
+        objectWillChange.send()
+        folders[index].name = newName
+        saveToUserDefaults()
+    }
+    
+    func setIcon(forFolderAt index: Int, iconName: String) {
+        guard index < folders.count else { return }
+        objectWillChange.send()
+        folders[index].iconName = iconName
+        saveToUserDefaults()
+    }
+    
+    func updateFolder(at index: Int, name: String, iconName: String) {
+        guard index < folders.count else { return }
+        objectWillChange.send()
+        folders[index].name = name
+        folders[index].iconName = iconName
+        saveToUserDefaults()
+    }
+    
+    func assignItem(windowID: CGWindowID, toFolderAt index: Int?) {
+        objectWillChange.send()
+        // Remove from all folders
+        for i in folders.indices {
+            folders[i].itemWindowIDs.remove(windowID)
+        }
+        // Add to target folder
+        if let index, index < folders.count {
+            folders[index].itemWindowIDs.insert(windowID)
+        }
+        saveToUserDefaults()
+    }
+    
+    func folderIndex(for windowID: CGWindowID) -> Int? {
+        folders.firstIndex { $0.itemWindowIDs.contains(windowID) }
+    }
+    
+    func items(for windowID: CGWindowID) -> Set<CGWindowID> {
+        folders.first { $0.itemWindowIDs.contains(windowID) }?.itemWindowIDs ?? []
+    }
+    
+    private func saveToUserDefaults() {
+        let dictArray = folders.map { folder -> [String: Any] in
+            [
+                "name": folder.name,
+                "iconName": folder.iconName,
+                "itemWindowIDs": Array(folder.itemWindowIDs).map { String($0) }
+            ]
+        }
+        UserDefaults.standard.set(dictArray, forKey: userDefaultsKey)
+    }
+    
+    private func loadFromUserDefaults() {
+        guard let dictArray = UserDefaults.standard.array(forKey: userDefaultsKey) as? [[String: Any]] else {
+            return
+        }
+        folders = dictArray.compactMap { dict in
+            guard let name = dict["name"] as? String,
+                  let iconName = dict["iconName"] as? String,
+                  let idStrings = dict["itemWindowIDs"] as? [String] else {
+                return nil
+            }
+            let windowIDs = Set(idStrings.compactMap { CGWindowID($0) })
+            return FolderInfo(name: name, iconName: iconName, itemWindowIDs: windowIDs)
         }
     }
+}
 
-    func saveToUserDefaults() {
-        var stringDict: [String: String] = [:]
-        for (windowID, folder) in folderAssignments {
-            stringDict[String(windowID)] = folder
-        }
-        if let data = try? JSONEncoder().encode(stringDict) {
-            UserDefaults.standard.set(data, forKey: userDefaultsKey)
-        }
-    }
-
-    private func saveFolderNames() {
-        UserDefaults.standard.set(Array(folderNames), forKey: folderNamesKey)
+private extension Array {
+    subscript(safe index: Index) -> Element? {
+        return indices.contains(index) ? self[index] : nil
     }
 }

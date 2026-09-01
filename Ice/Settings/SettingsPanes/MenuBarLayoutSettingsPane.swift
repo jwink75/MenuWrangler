@@ -8,7 +8,6 @@ import SwiftUI
 struct MenuBarLayoutSettingsPane: View {
     @EnvironmentObject var appState: AppState
     @ObservedObject var folderManager = LayoutFolderManager.shared
-    @State private var newFolderName = ""
     @AppStorage("MenuBarLayout_showItemLabels") private var showLabels: Bool = true
 
     init() {
@@ -24,7 +23,6 @@ struct MenuBarLayoutSettingsPane: View {
                 if !ScreenCapture.cachedCheckPermissions() {
                     permissionWarning
                 }
-                folderManagement
                 layoutBars
             }
         }
@@ -65,6 +63,21 @@ struct MenuBarLayoutSettingsPane: View {
         .toggleStyle(.switch)
         .font(.caption)
         .padding(.horizontal, 2)
+
+        HStack {
+            Text("Add new folders by dragging items to the \"New Folder\" section below.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button(action: {
+                folderManager.addFolder(named: "Folder \(folderManager.folders.count)", iconName: "folder")
+            }) {
+                Label("New Folder", systemImage: "folder.badge.plus")
+            }
+            .buttonStyle(.borderless)
+            .controlSize(.small)
+        }
+        .padding(.horizontal, 2)
     }
 
     @ViewBuilder
@@ -87,69 +100,33 @@ struct MenuBarLayoutSettingsPane: View {
     }
 
     @ViewBuilder
-    private var folderManagement: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Folders")
-                    .font(.system(size: 14))
-                    .padding(.leading, 2)
-
-                Spacer()
-
-                Button(action: {
-                    folderManager.createFolder(named: "New Folder")
-                }) {
-                    Label("New Folder", systemImage: "folder.badge.plus")
-                }
-                .buttonStyle(.borderless)
-                .controlSize(.small)
+    private var layoutBars: some View {
+        VStack(spacing: 25) {
+            // Visible section
+            sectionBar(for: .visible)
+            
+            // Folder sections
+            ForEach($folderManager.folders) { $folder in
+                FolderLayoutBar(folder: $folder)
             }
-
-            if folderManager.folderNames.isEmpty {
-                Text("Create folders to group related items together. Drag items from Visible/Hidden sections into folders.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 2)
-            } else {
-                ForEach(Array(folderManager.folderNames.sorted()), id: \.self) { name in
-                    FolderLayoutBar(folderName: name)
-                }
-                .onDelete(perform: deleteFolders)
-            }
+            .onDelete(perform: deleteFolders)
+            
+            // Hidden section (if more than one folder, Hidden is just the first one)
+            // Always show after folders
+            sectionBar(for: .alwaysHidden)
         }
     }
 
     private func deleteFolders(at offsets: IndexSet) {
-        let sortedNames = Array(folderManager.folderNames.sorted())
-        for index in offsets {
-            folderManager.deleteFolder(named: sortedNames[index])
+        // Delete in reverse order to maintain correct indices
+        for index in offsets.sorted(by: >) {
+            folderManager.deleteFolder(at: index)
         }
     }
 
     @ViewBuilder
-    private var layoutBars: some View {
-        VStack(spacing: 25) {
-            ForEach(MenuBarSection.Name.predefinedCases, id: \.self) { section in
-                layoutBar(for: section)
-            }
-            
-            // Folder sections
-            ForEach(Array(folderManager.folderNames.sorted()), id: \.self) { folderName in
-                folderLayoutBar(for: folderName)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var cannotArrange: some View {
-        Text("MenuWrangler cannot arrange menu bar items in automatically hidden menu bars")
-            .font(.title3)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-    }
-
-    @ViewBuilder
-    private func layoutBar(for section: MenuBarSection.Name) -> some View {
-        if let section = appState.menuBarManager.section(withName: section) {
+    private func sectionBar(for name: MenuBarSection.Name) -> some View {
+        if let section = appState.menuBarManager.section(withName: name) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("\(section.name.displayString) Section (enabled=\(section.isEnabled))")
                     .font(.system(size: 14))
@@ -165,14 +142,16 @@ struct MenuBarLayoutSettingsPane: View {
                 }
             }
         } else {
-            Text("\(section.displayString) Section (not found)")
+            Text("\(name.displayString) Section (not found)")
                 .font(.system(size: 14))
                 .foregroundStyle(.red)
         }
     }
 
     @ViewBuilder
-    private func folderLayoutBar(for folderName: String) -> some View {
-        FolderLayoutBar(folderName: folderName)
+    private var cannotArrange: some View {
+        Text("MenuWrangler cannot arrange menu bar items in automatically hidden menu bars")
+            .font(.title3)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
 }

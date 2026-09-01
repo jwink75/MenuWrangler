@@ -44,8 +44,8 @@ final class MenuBarSection {
         static var allCases: [MenuBarSection.Name] {
             var cases = predefinedCases
             let folderManager = LayoutFolderManager.shared
-            for name in folderManager.folderNames {
-                cases.append(.folder(name))
+            for folder in folderManager.folders {
+                cases.append(.folder(folder.name))
             }
             return cases
         }

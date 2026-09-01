@@ -8,12 +8,13 @@ import SwiftUI
 struct FolderLayoutBar: View {
     @EnvironmentObject var appState: AppState
     @ObservedObject var folderManager = LayoutFolderManager.shared
-    let folderName: String
+    @Binding var folder: FolderInfo
     @State private var items: [LayoutItemInfo] = []
     @State private var isRefreshing = false
     @State private var lastRefreshTime: Date = .distantPast
     @State private var isEditingName = false
     @State private var editedName = ""
+    @State private var showIconPicker = false
     @FocusState private var isNameFieldFocused: Bool
 
     private let minimumRefreshInterval: TimeInterval = 0.3
@@ -32,22 +33,34 @@ struct FolderLayoutBar: View {
                         isNameFieldFocused = true
                     }
                 } else {
-                    Text(folderName)
-                        .font(.system(size: 14, weight: .medium))
-                        .onTapGesture(count: 2) {
-                            startEditingName()
-                        }
-                        .contextMenu {
-                            Button("Rename") {
+                    HStack(spacing: 4) {
+                        Image(systemName: folder.iconName)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        
+                        Text(folder.name)
+                            .font(.system(size: 14, weight: .medium))
+                            .onTapGesture(count: 2) {
                                 startEditingName()
                             }
-                        }
+                            .contextMenu {
+                                Button("Rename") {
+                                    startEditingName()
+                                }
+                                Button("Change Icon…") {
+                                    showIconPicker = true
+                                }
+                            }
+                    }
                 }
 
                 Spacer()
 
                 Button(action: {
-                    folderManager.deleteFolder(named: folderName)
+                    let index = folderManager.folders.firstIndex(where: { $0.id == folder.id })
+                    if let index {
+                        folderManager.deleteFolder(at: index)
+                    }
                 }) {
                     Image(systemName: "xmark.circle.fill")
                         .font(.caption)
@@ -65,11 +78,9 @@ struct FolderLayoutBar: View {
                             .frame(height: 32)
                     }
                     ForEach(items) { item in
-                        LayoutItemView(item: item, onReorder: { _, _ in
-                            // Reorder within folder - no OS operation needed
-                        })
+                        LayoutItemView(item: item)
                         .onDrag({
-                            return NSItemProvider(object: String(item.windowID) as NSString)
+                            NSItemProvider(object: String(item.windowID) as NSString)
                         }, preview: {
                             Image(nsImage: item.image)
                                 .resizable()
@@ -99,8 +110,19 @@ struct FolderLayoutBar: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             refreshItems()
         }
+        .onChange(of: folder) { newValue in
+            refreshItems()
+            // Persist icon change
+            let index = folderManager.folders.firstIndex(where: { $0.id == folder.id })
+            if let index {
+                folderManager.updateFolder(at: index, name: folder.name, iconName: folder.iconName)
+            }
+        }
         .onDrop(of: [.text], isTargeted: nil) { providers in
             handleDrop(providers: providers)
+        }
+        .sheet(isPresented: $showIconPicker) {
+            IconPickerView(selectedIcon: $folder.iconName)
         }
     }
 
@@ -113,9 +135,8 @@ struct FolderLayoutBar: View {
         lastRefreshTime = now
 
         let allWindows = WindowQuery.getMenuBarWindows()
-        let nonFoldered = allWindows.filter { !folderManager.folderAssignments.keys.contains($0.windowID) }
-        items = folderManager.items(in: folderName, from: allWindows)
-
+        items = folderManager.items(in: folder)
+        
         isRefreshing = false
     }
 
@@ -129,8 +150,11 @@ struct FolderLayoutBar: View {
             }
 
             DispatchQueue.main.async {
-                folderManager.assign(LayoutItemInfo.dummy(windowID: windowID), to: folderName)
-                refreshItems()
+                let index = folderManager.folders.firstIndex(where: { $0.id == self.folder.id })
+                if let index {
+                    folderManager.assignItem(windowID: windowID, toFolderAt: index)
+                }
+                NotificationCenter.default.post(name: NSNotification.Name("MenuBarsNeedRefresh"), object: nil)
             }
         }
 
@@ -138,26 +162,26 @@ struct FolderLayoutBar: View {
     }
     
     private func startEditingName() {
-        editedName = folderName
+        editedName = folder.name
         isEditingName = true
     }
     
     private func saveFolderName() {
         let trimmedName = editedName.trimmingCharacters(in: .whitespaces)
-        if !trimmedName.isEmpty && trimmedName != folderName {
-            // Rename: update all items' assignments
-            let itemsToMove = folderManager.folderAssignments.filter { $0.value == folderName }
-            folderManager.deleteFolder(named: folderName)
-            for (windowID, _) in itemsToMove {
-                folderManager.folderAssignments[windowID] = trimmedName
+        if !trimmedName.isEmpty && trimmedName != folder.name {
+            let index = folderManager.folders.firstIndex(where: { $0.id == folder.id })
+            if let index {
+                folderManager.renameFolder(at: index, to: trimmedName)
             }
-            folderManager.folderNames.insert(trimmedName)
-            folderManager.saveToUserDefaults()
-        } else if trimmedName == folderName {
-            // No change
         }
         isEditingName = false
         isNameFieldFocused = false
-        NotificationCenter.default.post(name: NSNotification.Name("MenuBarsNeedRefresh"), object: nil)
+    }
+}
+
+extension LayoutFolderManager {
+    func items(in folder: FolderInfo) -> [LayoutItemInfo] {
+        let allWindows = WindowQuery.getMenuBarWindows()
+        return allWindows.filter { folder.itemWindowIDs.contains($0.windowID) }
     }
 }
