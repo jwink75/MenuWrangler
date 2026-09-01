@@ -10,6 +10,11 @@ struct MenuBarLayoutSettingsPane: View {
     @ObservedObject var folderManager = LayoutFolderManager.shared
     @State private var showNewFolderDialog = false
     @State private var newFolderName = ""
+    @AppStorage("MenuBarLayout_showItemLabels") private var showLabels: Bool = true
+
+    init() {
+        UserDefaults.standard.register(defaults: ["MenuBarLayout_showItemLabels": true])
+    }
 
     var body: some View {
         if appState.menuBarManager.isMenuBarHiddenBySystemUserDefaults {
@@ -80,14 +85,7 @@ struct MenuBarLayoutSettingsPane: View {
             }
         }
 
-        HStack {
-            Toggle("Show item labels", isOn: Binding(
-                get: { UserDefaults.standard.bool(forKey: "MenuBarLayout_showItemLabels") },
-                set: { newValue in
-                    UserDefaults.standard.set(newValue, forKey: "MenuBarLayout_showItemLabels")
-                }
-            ))
-        }
+        Toggle("Show item labels", isOn: $showLabels)
         .toggleStyle(.switch)
         .font(.caption)
         .padding(.horizontal, 2)
@@ -129,7 +127,6 @@ struct MenuBarLayoutSettingsPane: View {
                 }
                 .buttonStyle(.borderless)
                 .controlSize(.small)
-                .disabled(folderManager.folderNames.isEmpty)
             }
 
             if folderManager.folderNames.isEmpty {
