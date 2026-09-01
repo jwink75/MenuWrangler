@@ -9,10 +9,11 @@ import Cocoa
 @MainActor
 final class MenuBarSection {
     /// The name of a menu bar section.
-    enum Name: CaseIterable {
+    enum Name: Hashable {
         case visible
         case hidden
         case alwaysHidden
+        case folder(String)
 
         /// A string to show in the interface.
         var displayString: String {
@@ -20,6 +21,7 @@ final class MenuBarSection {
             case .visible: "Visible"
             case .hidden: "Hidden"
             case .alwaysHidden: "Always-Hidden"
+            case .folder(let name): name
             }
         }
 
@@ -29,7 +31,29 @@ final class MenuBarSection {
             case .visible: "visible section"
             case .hidden: "hidden section"
             case .alwaysHidden: "always-hidden section"
+            case .folder(let name): "folder section: \(name)"
             }
+        }
+        
+        /// A static list of predefined section names (excluding dynamic folders).
+        static var predefinedCases: [MenuBarSection.Name] {
+            [.visible, .hidden, .alwaysHidden]
+        }
+        
+        /// All cases including dynamic folder sections.
+        static var allCases: [MenuBarSection.Name] {
+            var cases = predefinedCases
+            let folderManager = LayoutFolderManager.shared
+            for name in folderManager.folderNames {
+                cases.append(.folder(name))
+            }
+            return cases
+        }
+        
+        /// Whether this section name represents a user-defined folder.
+        var isFolder: Bool {
+            if case .folder = self { return true }
+            return false
         }
     }
 
@@ -82,6 +106,8 @@ final class MenuBarSection {
                 return iceBarPanel?.currentSection != .hidden
             case .alwaysHidden:
                 return iceBarPanel?.currentSection != .alwaysHidden
+            case .folder:
+                return false
             }
         }
         switch name {
@@ -95,6 +121,8 @@ final class MenuBarSection {
                 return false
             }
             return controlItem.state == .hideItems
+        case .folder:
+            return false
         }
     }
 
@@ -123,6 +151,9 @@ final class MenuBarSection {
             ControlItem(identifier: .hidden, appState: appState)
         case .alwaysHidden:
             ControlItem(identifier: .alwaysHidden, appState: appState)
+        case .folder:
+            // Folders don't have control items - they're virtual groupings
+            ControlItem(identifier: .hidden, appState: appState)
         }
         self.init(name: name, controlItem: controlItem, appState: appState)
     }
@@ -184,6 +215,9 @@ final class MenuBarSection {
             controlItem.state = .showItems
             hiddenSection.controlItem.state = .showItems
             visibleSection.controlItem.state = .showItems
+        case .folder:
+            // Folders are virtual - no show/hide needed
+            return
         }
         startRehideChecks()
     }
@@ -224,6 +258,9 @@ final class MenuBarSection {
             alwaysHiddenSection.controlItem.state = .hideItems
         case .alwaysHidden:
             controlItem.state = .hideItems
+        case .folder:
+            // Folders are virtual - no hide needed
+            return
         }
         appState.allowShowOnHover()
         stopRehideChecks()

@@ -132,6 +132,11 @@ struct MenuBarLayoutSettingsPane: View {
             ForEach(MenuBarSection.Name.allCases, id: \.self) { section in
                 layoutBar(for: section)
             }
+            
+            // Folder sections
+            ForEach(Array(folderManager.folderNames.sorted()), id: \.self) { folderName in
+                folderLayoutBar(for: folderName)
+            }
         }
     }
 
@@ -164,5 +169,10 @@ struct MenuBarLayoutSettingsPane: View {
                 .font(.system(size: 14))
                 .foregroundStyle(.red)
         }
+    }
+
+    @ViewBuilder
+    private func folderLayoutBar(for folderName: String) -> some View {
+        FolderLayoutBar(folderName: folderName)
     }
 }

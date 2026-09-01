@@ -442,4 +442,17 @@ struct LayoutItemInfo: Identifiable, Hashable {
     static func == (lhs: LayoutItemInfo, rhs: LayoutItemInfo) -> Bool {
         lhs.windowID == rhs.windowID
     }
+
+    static func dummy(windowID: CGWindowID) -> LayoutItemInfo {
+        LayoutItemInfo(
+            windowID: windowID,
+            image: NSImage(),
+            ownerPID: 0,
+            ownerName: "",
+            bundleIdentifier: nil,
+            frame: .zero,
+            title: "",
+            isDelimiter: false
+        )
+    }
 }

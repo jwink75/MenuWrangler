@@ -113,6 +113,8 @@ struct DirectQueryLayoutBar: View {
             }
         case .alwaysHidden:
             result = []
+        case .folder:
+            result = [] // Folders are handled by FolderLayoutBar
         }
 
         return result
@@ -136,9 +138,25 @@ struct DirectQueryLayoutBar: View {
     }
 
     private func moveItem(windowID: CGWindowID, to targetSection: MenuBarSection) {
+        let folderManager = LayoutFolderManager.shared
+
+        // Handle folder targets - just update assignment, no OS calls
+        if case .folder(let folderName) = targetSection.name {
+            folderManager.assign(LayoutItemInfo.dummy(windowID: windowID), to: folderName)
+            draggedItem = nil
+            NotificationCenter.default.post(name: NSNotification.Name("MenuBarsNeedRefresh"), object: nil)
+            refreshItems()
+            return
+        }
+
         guard let item = MenuBarItem(windowID: windowID) else {
             draggedItem = nil
             return
+        }
+
+        // Handle moving from a folder back to a regular section
+        if folderManager.folderAssignments.keys.contains(windowID) {
+            folderManager.assign(LayoutItemInfo.dummy(windowID: windowID), to: nil)
         }
 
         guard let hiddenSection = appState.menuBarManager.section(withName: .hidden),
@@ -163,6 +181,8 @@ struct DirectQueryLayoutBar: View {
                        let alwaysHiddenControlItem = MenuBarItem(windowID: alwaysHiddenWinID) {
                         try await appState.itemManager.move(item: item, to: .leftOfItem(alwaysHiddenControlItem))
                     }
+                case .folder:
+                    break
                 }
 
                 await MainActor.run {

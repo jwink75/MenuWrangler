@@ -160,18 +160,3 @@ struct FolderLayoutBar: View {
         isNameFieldFocused = false
     }
 }
-
-private extension LayoutItemInfo {
-    static func dummy(windowID: CGWindowID) -> LayoutItemInfo {
-        LayoutItemInfo(
-            windowID: windowID,
-            image: NSImage(),
-            ownerPID: 0,
-            ownerName: "",
-            bundleIdentifier: nil,
-            frame: .zero,
-            title: "",
-            isDelimiter: false
-        )
-    }
-}

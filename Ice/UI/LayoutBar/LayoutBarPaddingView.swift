@@ -108,6 +108,7 @@ final class LayoutBarPaddingView: NSView {
                 case .visible: nil // visible section always has more than 1 item
                 case .hidden: items.first { $0.info == .hiddenControlItem }
                 case .alwaysHidden: items.first { $0.info == .alwaysHiddenControlItem }
+                case .folder: items.first { $0.info == .hiddenControlItem }
                 }
                 if let targetItem {
                     move(item: draggingSource.item, to: .leftOfItem(targetItem))

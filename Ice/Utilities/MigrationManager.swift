@@ -147,6 +147,8 @@ extension MigrationManager {
                 ControlItem.Identifier.hidden.deprecatedRawValue
             case .alwaysHidden:
                 ControlItem.Identifier.alwaysHidden.deprecatedRawValue
+            case .folder:
+                ControlItem.Identifier.hidden.deprecatedRawValue
             }
 
             // add the "identifier" key to the dictionary
@@ -408,6 +410,7 @@ private extension MenuBarSection.Name {
         case .visible: "Visible"
         case .hidden: "Hidden"
         case .alwaysHidden: "Always Hidden"
+        case .folder(let name): name
         }
     }
 }

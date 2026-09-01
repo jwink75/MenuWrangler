@@ -15,7 +15,6 @@ final class ControlItem {
         case hidden = "HItem"
         case alwaysHidden = "AHItem"
     }
-
     /// Possible hiding states for control items.
     enum HidingState {
         case hideItems, showItems
@@ -160,6 +159,7 @@ final class ControlItem {
                         case .hideItems: Lengths.expanded
                         case .showItems: Lengths.standard
                         }
+                    case .folder: Lengths.standard
                     }
                     constraint?.isActive = true
                 } else {
@@ -198,6 +198,7 @@ final class ControlItem {
                 case .visible: nil
                 case .hidden: manager.hotkey(withAction: .toggleHiddenSection)
                 case .alwaysHidden: manager.hotkey(withAction: .toggleAlwaysHiddenSection)
+                case .folder: nil
                 }
 
                 guard let hotkey else {
@@ -360,7 +361,7 @@ final class ControlItem {
                 let newSize = CGSize(width: originalWidth / ratio, height: originalHeight / ratio)
                 button.image = originalImage.resized(to: newSize)
             }
-        case .hidden, .alwaysHidden:
+        case .hidden, .alwaysHidden, .folder:
             switch state {
             case .hideItems:
                 isVisible = true
@@ -379,7 +380,7 @@ final class ControlItem {
                     button.image = ControlItemImage.builtin(.chevronLarge).nsImage(for: appState)
                 case .alwaysHidden:
                     button.image = ControlItemImage.builtin(.chevronSmall).nsImage(for: appState)
-                case .visible: break
+                case .visible, .folder: break
                 }
             }
         }
@@ -486,6 +487,8 @@ final class ControlItem {
                     item.keyEquivalent = keyCombination.key.keyEquivalent
                     item.keyEquivalentModifierMask = keyCombination.modifiers.nsEventFlags
                 }
+            case .folder:
+                break
             }
             menu.addItem(item)
         }
