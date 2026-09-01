@@ -97,14 +97,18 @@ struct DirectQueryLayoutBar: View {
         let delimiter = sortedWindows.first { $0.isDelimiter }
         let delimiterX = delimiter?.frame.origin.x ?? ((NSScreen.main?.frame.width ?? 1200) * 0.75)
 
+        // Exclude items that are in folders
+        let folderManager = LayoutFolderManager.shared
+        let nonFolderedWindows = sortedWindows.filter { !folderManager.folderAssignments.keys.contains($0.windowID) }
+
         let result: [LayoutItemInfo]
         switch section.name {
         case .visible:
-            result = sortedWindows.filter { window in
+            result = nonFolderedWindows.filter { window in
                 window.frame.origin.x >= delimiterX && !window.isDelimiter
             }
         case .hidden:
-            result = sortedWindows.filter { window in
+            result = nonFolderedWindows.filter { window in
                 window.frame.origin.x < delimiterX && !window.isDelimiter
             }
         case .alwaysHidden:

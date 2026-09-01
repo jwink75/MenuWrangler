@@ -7,6 +7,9 @@ import SwiftUI
 
 struct MenuBarLayoutSettingsPane: View {
     @EnvironmentObject var appState: AppState
+    @ObservedObject var folderManager = LayoutFolderManager.shared
+    @State private var showNewFolderDialog = false
+    @State private var newFolderName = ""
 
     var body: some View {
         if appState.menuBarManager.isMenuBarHiddenBySystemUserDefaults {
@@ -17,7 +20,31 @@ struct MenuBarLayoutSettingsPane: View {
                 if !ScreenCapture.cachedCheckPermissions() {
                     permissionWarning
                 }
+                folderManagement
                 layoutBars
+            }
+            .sheet(isPresented: $showNewFolderDialog) {
+                VStack(spacing: 16) {
+                    Text("New Folder")
+                        .font(.headline)
+                    TextField("Folder name", text: $newFolderName)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 250)
+                    HStack {
+                        Button("Cancel") {
+                            showNewFolderDialog = false
+                            newFolderName = ""
+                        }
+                        Button("Create") {
+                            folderManager.createFolder(named: newFolderName)
+                            showNewFolderDialog = false
+                            newFolderName = ""
+                        }
+                        .disabled(newFolderName.isEmpty)
+                    }
+                }
+                .padding()
+                .frame(minWidth: 300, minHeight: 150)
             }
         }
     }
@@ -82,6 +109,47 @@ struct MenuBarLayoutSettingsPane: View {
         }
         .onTapGesture {
             appState.navigationState.settingsNavigationIdentifier = .advanced
+        }
+    }
+
+    @ViewBuilder
+    private var folderManagement: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Folders")
+                    .font(.system(size: 14))
+                    .padding(.leading, 2)
+
+                Spacer()
+
+                Button(action: {
+                    showNewFolderDialog = true
+                }) {
+                    Label("New Folder", systemImage: "folder.badge.plus")
+                }
+                .buttonStyle(.borderless)
+                .controlSize(.small)
+                .disabled(folderManager.folderNames.isEmpty)
+            }
+
+            if folderManager.folderNames.isEmpty {
+                Text("Create folders to group related items together.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 2)
+            } else {
+                ForEach(Array(folderManager.folderNames.sorted()), id: \.self) { name in
+                    FolderLayoutBar(folderName: name)
+                }
+                .onDelete(perform: deleteFolders)
+            }
+        }
+    }
+
+    private func deleteFolders(at offsets: IndexSet) {
+        let sortedNames = Array(folderManager.folderNames.sorted())
+        for index in offsets {
+            folderManager.deleteFolder(named: sortedNames[index])
         }
     }
 
