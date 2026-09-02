@@ -135,7 +135,24 @@ struct FolderLayoutBar: View {
         lastRefreshTime = now
 
         let allWindows = WindowQuery.getMenuBarWindows()
-        items = folderManager.items(in: folder)
+        
+        // First folder (Hidden) should show items left of delimiter that aren't in other folders
+        if folder.id == folderManager.folders.first?.id {
+            // First folder: show hidden items (left of delimiter) that aren't in other folders
+            let sortedWindows = allWindows.sorted { $0.frame.origin.x < $1.frame.origin.x }
+            let delimiter = sortedWindows.first { $0.isDelimiter }
+            let delimiterX = delimiter?.frame.origin.x ?? ((NSScreen.main?.frame.width ?? 1200) * 0.75)
+            
+            // Get items in other folders (not this first one)
+            let otherFolderItems = Set(folderManager.folders.dropFirst().flatMap { $0.itemWindowIDs })
+            
+            items = sortedWindows.filter { window in
+                window.frame.origin.x < delimiterX && !window.isDelimiter && !otherFolderItems.contains(window.windowID)
+            }
+        } else {
+            // Other folders: only items explicitly assigned
+            items = allWindows.filter { folder.itemWindowIDs.contains($0.windowID) }
+        }
         
         isRefreshing = false
     }
