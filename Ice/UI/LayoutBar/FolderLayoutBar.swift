@@ -8,7 +8,7 @@ import SwiftUI
 struct FolderLayoutBar: View {
     @EnvironmentObject var appState: AppState
     @ObservedObject var folderManager = LayoutFolderManager.shared
-    @Binding var folder: FolderInfo
+    let folder: FolderInfo
     @State private var items: [LayoutItemInfo] = []
     @State private var isRefreshing = false
     @State private var lastRefreshTime: Date = .distantPast
@@ -104,25 +104,25 @@ struct FolderLayoutBar: View {
         .onAppear {
             refreshItems()
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("MenuBarsNeedRefresh"))) { _ in
+        .onReceive(folderManager.$folders) { _ in
             refreshItems()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             refreshItems()
         }
-        .onChange(of: folder) { newValue in
-            refreshItems()
-            // Persist icon change
-            let index = folderManager.folders.firstIndex(where: { $0.id == folder.id })
-            if let index {
-                folderManager.updateFolder(at: index, name: folder.name, iconName: folder.iconName)
-            }
-        }
         .onDrop(of: [.text], isTargeted: nil) { providers in
             handleDrop(providers: providers)
         }
         .sheet(isPresented: $showIconPicker) {
-            IconPickerView(selectedIcon: $folder.iconName)
+            IconPickerView(selectedIcon: Binding(
+                get: { folder.iconName },
+                set: { newIcon in
+                    let index = folderManager.folders.firstIndex(where: { $0.id == folder.id })
+                    if let index {
+                        folderManager.setIcon(forFolderAt: index, iconName: newIcon)
+                    }
+                }
+            ))
         }
     }
 
@@ -136,9 +136,10 @@ struct FolderLayoutBar: View {
 
         let allWindows = WindowQuery.getMenuBarWindows()
         
-        // First folder (Hidden) should show items left of delimiter that aren't in other folders
-        if folder.id == folderManager.folders.first?.id {
-            // First folder: show hidden items (left of delimiter) that aren't in other folders
+        let folderIndex = folderManager.folders.firstIndex(where: { $0.id == folder.id })
+        
+        if folderIndex == 0 {
+            // First folder (Hidden): show items left of delimiter that aren't in other folders
             let sortedWindows = allWindows.sorted { $0.frame.origin.x < $1.frame.origin.x }
             let delimiter = sortedWindows.first { $0.isDelimiter }
             let delimiterX = delimiter?.frame.origin.x ?? ((NSScreen.main?.frame.width ?? 1200) * 0.75)
@@ -149,9 +150,8 @@ struct FolderLayoutBar: View {
             items = sortedWindows.filter { window in
                 window.frame.origin.x < delimiterX && !window.isDelimiter && !otherFolderItems.contains(window.windowID)
             }
-        } else {
-            // Other folders: only items explicitly assigned
-            items = allWindows.filter { folder.itemWindowIDs.contains($0.windowID) }
+        } else if let folderIndex {
+            items = allWindows.filter { folderManager.folders[folderIndex].itemWindowIDs.contains($0.windowID) }
         }
         
         isRefreshing = false
@@ -167,9 +167,9 @@ struct FolderLayoutBar: View {
             }
 
             DispatchQueue.main.async {
-                let index = folderManager.folders.firstIndex(where: { $0.id == self.folder.id })
-                if let index {
-                    folderManager.assignItem(windowID: windowID, toFolderAt: index)
+                let folderIndex = self.folderManager.folders.firstIndex(where: { $0.id == self.folder.id })
+                if let folderIndex {
+                    self.folderManager.assignItem(windowID: windowID, toFolderAt: folderIndex)
                 }
                 NotificationCenter.default.post(name: NSNotification.Name("MenuBarsNeedRefresh"), object: nil)
             }
@@ -193,12 +193,5 @@ struct FolderLayoutBar: View {
         }
         isEditingName = false
         isNameFieldFocused = false
-    }
-}
-
-extension LayoutFolderManager {
-    func items(in folder: FolderInfo) -> [LayoutItemInfo] {
-        let allWindows = WindowQuery.getMenuBarWindows()
-        return allWindows.filter { folder.itemWindowIDs.contains($0.windowID) }
     }
 }

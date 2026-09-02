@@ -106,8 +106,8 @@ struct MenuBarLayoutSettingsPane: View {
             sectionBar(for: .visible)
             
             // Folder sections
-            ForEach($folderManager.folders) { $folder in
-                FolderLayoutBar(folder: $folder)
+            ForEach(folderManager.folders) { folder in
+                FolderLayoutBar(folder: folder)
             }
             .onDelete(perform: deleteFolders)
             
