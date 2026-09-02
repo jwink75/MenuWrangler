@@ -75,13 +75,7 @@ struct DirectQueryLayoutBar: View {
         lastRefreshTime = now
 
         let allWindows = WindowQuery.getMenuBarWindows()
-        print("[LayoutBar] Section: \(section.name), total windows found: \(allWindows.count)")
-        
         items = filterWindowsForSection(allWindows)
-        print("[LayoutBar] Section: \(section.name), items after filter: \(items.count)")
-        for item in items {
-            print("[LayoutBar]   \(item.windowID): \(item.ownerName) title='\(item.title)' resolved='\(item.resolvedTitle)'")
-        }
         isRefreshing = false
     }
 

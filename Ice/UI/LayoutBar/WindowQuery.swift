@@ -12,7 +12,6 @@ enum WindowQuery {
 
     static func getMenuBarWindows() -> [LayoutItemInfo] {
         let windowIDs = Bridging.getWindowList(option: [.menuBarItems])
-        print("[WindowQuery] Window list count: \(windowIDs.count)")
 
         var allOwnerNames: Set<String> = []
         var allTitles: Set<String> = []
@@ -43,7 +42,6 @@ enum WindowQuery {
             let windowTitle = windowInfo.title ?? ""
             let ownerPID = windowInfo.ownerPID
             let bundleIdentifier = NSRunningApplication(processIdentifier: ownerPID)?.bundleIdentifier
-            print("[WindowQuery] windowID=\(windowID) owner='\(ownerName)' pid=\(ownerPID) title='\(windowTitle)' bundleID='\(bundleIdentifier ?? "nil")' frame=\(frame) alpha=\(windowInfo.alpha)")
 
             // Collect debug info
             allOwnerNames.insert(ownerName)
@@ -74,12 +72,6 @@ enum WindowQuery {
                 isDelimiter: isDelimiter
             )
         }
-
-        // Debug info
-        UserDefaults.standard.set(windowIDs.count, forKey: "WindowQuery_totalWindows")
-        UserDefaults.standard.set(result.count, forKey: "WindowQuery_windowsAtLayer25")
-        UserDefaults.standard.set(allOwnerNames.sorted().joined(separator: ","), forKey: "WindowQuery_allOwners")
-        UserDefaults.standard.set(allTitles.sorted().joined(separator: ","), forKey: "WindowQuery_allTitles")
 
         return result
     }

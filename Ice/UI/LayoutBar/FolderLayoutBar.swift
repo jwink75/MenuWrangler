@@ -17,7 +17,7 @@ struct FolderLayoutBar: View {
     @State private var showIconPicker = false
     @FocusState private var isNameFieldFocused: Bool
 
-    private let minimumRefreshInterval: TimeInterval = 0.3
+    private let minimumRefreshInterval: TimeInterval = 0.5
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -104,8 +104,11 @@ struct FolderLayoutBar: View {
         .onAppear {
             refreshItems()
         }
-        .onReceive(folderManager.$folders) { _ in
-            refreshItems()
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("MenuBarsNeedRefresh"))) { _ in
+            // Debounce: only refresh if not already refreshing
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                refreshItems()
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             refreshItems()
@@ -127,10 +130,15 @@ struct FolderLayoutBar: View {
     }
 
     private func refreshItems() {
+        // Skip if we're currently refreshing
+        guard !isRefreshing else { return }
+        
         let now = Date()
-        guard !isRefreshing, now.timeIntervalSince(lastRefreshTime) >= minimumRefreshInterval else {
+        // Time-based debounce
+        guard now.timeIntervalSince(lastRefreshTime) >= minimumRefreshInterval else {
             return
         }
+        
         isRefreshing = true
         lastRefreshTime = now
 
@@ -171,7 +179,10 @@ struct FolderLayoutBar: View {
                 if let folderIndex {
                     self.folderManager.assignItem(windowID: windowID, toFolderAt: folderIndex)
                 }
-                NotificationCenter.default.post(name: NSNotification.Name("MenuBarsNeedRefresh"), object: nil)
+                // Use a delayed refresh to avoid re-entrancy
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    NotificationCenter.default.post(name: NSNotification.Name("MenuBarsNeedRefresh"), object: nil)
+                }
             }
         }
 
