@@ -9,10 +9,15 @@ struct FolderLayoutBar: View {
     @EnvironmentObject var appState: AppState
     @ObservedObject var folderManager = LayoutFolderManager.shared
     let folder: FolderInfo
+    let isFirstFolder: Bool
+    @State private var liveItems: [LayoutItemInfo] = []
     @State private var isEditingName = false
     @State private var editedName = ""
     @State private var showIconPicker = false
+    @State private var lastRefreshTime: Date = .distantPast
     @FocusState private var isNameFieldFocused: Bool
+
+    private let minimumRefreshInterval: TimeInterval = 0.5
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -32,7 +37,7 @@ struct FolderLayoutBar: View {
                         Image(systemName: folder.iconName)
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        
+
                         Text(folder.name)
                             .font(.system(size: 14, weight: .medium))
                             .onTapGesture(count: 2) {
@@ -53,41 +58,38 @@ struct FolderLayoutBar: View {
                 .buttonStyle(.borderless)
                 .help("Change Icon")
 
-                Button(action: {
-                    let index = folderManager.folders.firstIndex(where: { $0.id == folder.id })
-                    if let index {
-                        folderManager.deleteFolder(at: index)
+                if !isFirstFolder {
+                    Button(action: {
+                        let index = folderManager.folders.firstIndex(where: { $0.id == folder.id })
+                        if let index {
+                            folderManager.deleteFolder(at: index)
+                        }
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    .buttonStyle(.borderless)
+                    .help("Delete Folder")
                 }
-                .buttonStyle(.borderless)
-                .help("Delete Folder")
             }
 
             ScrollView(.horizontal, showsIndicators: true) {
                 HStack(spacing: 8) {
-                    if folder.items.isEmpty {
+                    if displayedItems.isEmpty {
                         Text("No items")
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 12)
                             .frame(height: 32)
                     }
-                    ForEach(folder.items) { item in
+                    ForEach(displayedItems, id: \.windowID) { item in
                         FolderItemView(item: item)
                         .onDrag({
                             NSItemProvider(object: String(item.windowID) as NSString)
                         }, preview: {
-                            if let image = item.image {
-                                Image(nsImage: image)
-                                    .resizable()
-                                    .frame(width: 20, height: 20)
-                            } else {
-                                Image(systemName: "circle")
-                                    .frame(width: 20, height: 20)
-                            }
+                            Image(nsImage: item.image)
+                                .resizable()
+                                .frame(width: 20, height: 20)
                         })
                     }
                 }
@@ -104,19 +106,68 @@ struct FolderLayoutBar: View {
                     .stroke(.quaternary, lineWidth: 0.5)
             )
         }
+        .onAppear {
+            refreshLiveItems()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("MenuBarsNeedRefresh"))) { _ in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                refreshLiveItems()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshLiveItems()
+        }
         .onDrop(of: [.text], isTargeted: nil) { providers in
             handleDrop(providers: providers)
         }
         .sheet(isPresented: $showIconPicker) {
-            IconPickerView(selectedIcon: Binding(
-                get: { folder.iconName },
-                set: { newIcon in
-                    let index = folderManager.folders.firstIndex(where: { $0.id == folder.id })
-                    if let index {
-                        folderManager.setIcon(forFolderAt: index, iconName: newIcon)
-                    }
+            IconPickerView { newIcon in
+                let index = folderManager.folders.firstIndex(where: { $0.id == folder.id })
+                if let index {
+                    folderManager.setIcon(forFolderAt: index, iconName: newIcon)
                 }
-            ))
+            }
+        }
+    }
+
+    private var displayedItems: [LayoutItemInfo] {
+        if isFirstFolder {
+            return liveItems
+        } else {
+            return folder.items.map { folderItem in
+                LayoutItemInfo(
+                    windowID: folderItem.windowID,
+                    image: folderItem.image ?? NSImage(),
+                    ownerPID: 0,
+                    ownerName: folderItem.ownerName,
+                    bundleIdentifier: folderItem.bundleIdentifier,
+                    frame: .zero,
+                    title: folderItem.resolvedTitle,
+                    isDelimiter: false
+                )
+            }
+        }
+    }
+
+    private func refreshLiveItems() {
+        let now = Date()
+        guard now.timeIntervalSince(lastRefreshTime) >= minimumRefreshInterval else {
+            return
+        }
+        lastRefreshTime = now
+
+        guard isFirstFolder else { return }
+
+        let allWindows = WindowQuery.getMenuBarWindows()
+        let sortedWindows = allWindows.sorted { $0.frame.origin.x < $1.frame.origin.x }
+        let delimiter = sortedWindows.first { $0.isDelimiter }
+        let delimiterX = delimiter?.frame.origin.x ?? ((NSScreen.main?.frame.width ?? 1200) * 0.75)
+
+        let folderManager = LayoutFolderManager.shared
+        let otherFolderItems = Set(folderManager.folders.dropFirst().flatMap { $0.items.map { $0.windowID } })
+
+        liveItems = sortedWindows.filter { window in
+            window.frame.origin.x < delimiterX && !window.isDelimiter && !otherFolderItems.contains(window.windowID)
         }
     }
 
@@ -133,8 +184,7 @@ struct FolderLayoutBar: View {
                 guard let folderIndex = self.folderManager.folders.firstIndex(where: { $0.id == self.folder.id }) else {
                     return
                 }
-                
-                // Try to find the item in menu bar (for live items)
+
                 if let layoutItem = WindowQuery.getMenuBarWindows().first(where: { $0.windowID == windowID }) {
                     self.folderManager.addItemToFolderByWindowID(
                         windowID,
@@ -145,7 +195,6 @@ struct FolderLayoutBar: View {
                         image: layoutItem.image
                     )
                 } else {
-                    // Item may be from another folder - find it
                     for sourceFolder in self.folderManager.folders {
                         if let item = sourceFolder.items.first(where: { $0.windowID == windowID }) {
                             self.folderManager.addItemToFolder(item: item, folderIndex: folderIndex)
@@ -158,12 +207,12 @@ struct FolderLayoutBar: View {
 
         return true
     }
-    
+
     private func startEditingName() {
         editedName = folder.name
         isEditingName = true
     }
-    
+
     private func saveFolderName() {
         let trimmedName = editedName.trimmingCharacters(in: .whitespaces)
         if !trimmedName.isEmpty && trimmedName != folder.name {
@@ -178,24 +227,24 @@ struct FolderLayoutBar: View {
 }
 
 struct FolderItemView: View {
-    let item: FolderItemInfo
-    
+    let item: LayoutItemInfo
+
+    var body: some View {
+        FolderItemContent(item: item)
+    }
+}
+
+private struct FolderItemContent: View {
+    let item: LayoutItemInfo
+    @AppStorage("MenuBarLayout_showItemLabels") private var showLabels: Bool = true
+
     var body: some View {
         HStack(spacing: 2) {
-            if let image = item.image {
-                Image(nsImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 20, height: 20)
-            } else {
-                Image(systemName: "circle")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 20, height: 20)
-                    .foregroundStyle(.secondary)
-            }
-            
-            @AppStorage("MenuBarLayout_showItemLabels") var showLabels: Bool = true
+            Image(nsImage: item.image)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 20, height: 20)
+
             if showLabels {
                 Text(item.resolvedTitle)
                     .font(.system(size: 8, weight: .medium))

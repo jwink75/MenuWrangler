@@ -7,7 +7,9 @@ import SwiftUI
 
 struct IconPickerView: View {
     @Environment(\.dismiss) var dismiss
-    @Binding var selectedIcon: String
+    let onSelect: (String) -> Void
+    
+    @State private var hoverIcon: String? = nil
     
     let commonIcons: [(name: String, label: String)] = [
         ("folder", "Folder"),
@@ -100,16 +102,25 @@ struct IconPickerView: View {
     ]
     
     var body: some View {
-        VStack {
-            Text("Choose Folder Icon")
-                .font(.headline)
-                .padding()
+        VStack(spacing: 0) {
+            HStack {
+                Text("Choose Folder Icon")
+                    .font(.headline)
+                Spacer()
+                Button("Cancel") {
+                    dismiss()
+                }
+                .keyboardShortcut(.cancelAction)
+            }
+            .padding()
+            
+            Divider()
             
             ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 60))], spacing: 16) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 70))], spacing: 16) {
                     ForEach(commonIcons, id: \.name) { icon in
                         Button(action: {
-                            selectedIcon = icon.name
+                            onSelect(icon.name)
                             dismiss()
                         }) {
                             VStack(spacing: 4) {
@@ -118,17 +129,22 @@ struct IconPickerView: View {
                                 Text(icon.label)
                                     .font(.caption)
                                     .multilineTextAlignment(.center)
+                                    .lineLimit(1)
                             }
-                            .frame(width: 60)
+                            .frame(width: 70, height: 50)
+                            .padding(4)
                         }
                         .buttonStyle(.plain)
-                        .background(icon.name == selectedIcon ? Color.accentColor.opacity(0.2) : Color.clear)
+                        .background(hoverIcon == icon.name ? Color.accentColor.opacity(0.3) : Color.clear)
                         .cornerRadius(8)
+                        .onHover { hovering in
+                            hoverIcon = hovering ? icon.name : (hoverIcon == icon.name ? nil : hoverIcon)
+                        }
                     }
                 }
                 .padding()
             }
         }
-        .frame(minWidth: 350, minHeight: 400)
+        .frame(minWidth: 380, minHeight: 450)
     }
 }
