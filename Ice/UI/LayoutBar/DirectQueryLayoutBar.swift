@@ -95,7 +95,7 @@ struct DirectQueryLayoutBar: View {
         let folderManager = LayoutFolderManager.shared
         let itemsInFolders = Set(folderManager.folders.dropFirst().flatMap { $0.itemWindowIDs })
         let nonFolderedWindows = sortedWindows.filter { !itemsInFolders.contains($0.windowID) }
-
+        
         let result: [LayoutItemInfo]
         switch section.name {
         case .visible:
@@ -135,14 +135,25 @@ struct DirectQueryLayoutBar: View {
     private func moveItem(windowID: CGWindowID, to targetSection: MenuBarSection) {
         let folderManager = LayoutFolderManager.shared
 
-        // Handle folder targets - just update assignment, no OS calls
+        // Handle folder targets - update folder assignment
         if case .folder(let folderName) = targetSection.name {
             if let folderIndex = folderManager.folders.firstIndex(where: { $0.name == folderName }) {
-                folderManager.assignItem(windowID: windowID, toFolderAt: folderIndex)
+                // Try to get item info from menu bar
+                if let layoutItem = WindowQuery.getMenuBarWindows().first(where: { $0.windowID == windowID }) {
+                    folderManager.addItemToFolderByWindowID(
+                        windowID,
+                        folderIndex: folderIndex,
+                        resolvedTitle: layoutItem.resolvedTitle,
+                        ownerName: layoutItem.ownerName,
+                        bundleIdentifier: layoutItem.bundleIdentifier,
+                        image: layoutItem.image
+                    )
+                } else {
+                    // Item may be from another folder
+                    folderManager.removeItem(windowID: windowID)
+                }
             }
             draggedItem = nil
-            NotificationCenter.default.post(name: NSNotification.Name("MenuBarsNeedRefresh"), object: nil)
-            refreshItems()
             return
         }
 
@@ -153,7 +164,7 @@ struct DirectQueryLayoutBar: View {
 
         // Handle moving from a folder back to a regular section
         if folderManager.folders.contains(where: { $0.itemWindowIDs.contains(windowID) }) {
-            folderManager.assignItem(windowID: windowID, toFolderAt: nil)
+            folderManager.removeItem(windowID: windowID)
         }
 
         guard let hiddenSection = appState.menuBarManager.section(withName: .hidden),

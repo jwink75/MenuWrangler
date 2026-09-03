@@ -49,8 +49,6 @@ final class MenuBarSection {
             }
             return cases
         }
-        
-        /// Whether this section name represents a user-defined folder.
         var isFolder: Bool {
             if case .folder = self { return true }
             return false
